@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package v1.formats;
+option go_package = "/v1/formats";
+service Service {
+  // DeleteTask removes a Task by its ID
+  rpc DeleteTask(Agent) returns (google.protobuf.Empty);
+}
+
+message Agent {
+  // ID is Agent ID
+  string ID = 1;
+}

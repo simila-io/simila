@@ -40,6 +40,7 @@ func NewMigration(driverName, dataSourceName string) *migration {
 
 func (m *migration) Init(ctx context.Context) error {
 	m.logger.Infof("starting...")
+	defer m.logger.Infof("migration completed.")
 	m.logger.Debugf("connection to %s %s", m.driverName, m.dataSourceName)
 	db, err := sqlx.Connect(m.driverName, m.dataSourceName)
 	if err != nil {
@@ -54,7 +55,7 @@ func (m *migration) Init(ctx context.Context) error {
 }
 
 func migrateUp(db *sql.DB) error {
-	migrs := make([]*migrate.Migration, 0)
+	migrs := []*migrate.Migration{}
 	migrs = append(migrs, dummy("0"))
 	migrs = append(migrs, migrations.InitTable("1"))
 	mms := migrate.MemoryMigrationSource{
