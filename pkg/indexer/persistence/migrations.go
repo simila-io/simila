@@ -11,17 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
 	"context"
 	"database/sql"
-	_ "database/sql"
 	"github.com/acquirecloud/golibs/logging"
 
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/simila-io/simila/pkg/indexer/persistence/migrations"
 )
@@ -57,8 +55,8 @@ func (m *migration) Init(ctx context.Context) error {
 
 func migrateUp(db *sql.DB) error {
 	migrs := make([]*migrate.Migration, 0)
+	migrs = append(migrs, dummy("0"))
 	migrs = append(migrs, migrations.InitTable("1"))
-	migrs = append(migrs, dummy("2"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -70,8 +68,8 @@ func migrateUp(db *sql.DB) error {
 
 func migrateDown(db *sql.DB) error {
 	migrs := make([]*migrate.Migration, 0)
+	migrs = append(migrs, dummy("0"))
 	migrs = append(migrs, migrations.InitTable("1"))
-	migrs = append(migrs, dummy("2"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}

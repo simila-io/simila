@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
@@ -24,6 +25,7 @@ import (
 	"github.com/lib/pq"
 	"io/ioutil"
 	"strings"
+	"time"
 )
 
 type (
@@ -85,7 +87,7 @@ func (d *db) Shutdown() {
 	}
 }
 
-// newModelTx returns the new ModelTx object
+// NewModelTx returns the new ModelTx object
 func (d *db) NewModelTx() ModelTx {
 	return &modelTx{tx: d.NewTx().(*tx)}
 }
@@ -96,6 +98,7 @@ func (d *db) NewTx() Tx {
 }
 
 // ============================== tx ====================================
+
 func (t *tx) executor() exec {
 	if t.tx == nil {
 		return t.db
@@ -144,13 +147,11 @@ func (t *tx) execQuery(sqlQuery string, params ...interface{}) error {
 // ExecScript runs the sqlScript (file name)
 func (t *tx) ExecScript(sqlScript string) error {
 	file, err := ioutil.ReadFile(sqlScript)
-
 	if err != nil {
 		return fmt.Errorf("could not read %s in ExecScript: %w", sqlScript, err)
 	}
 
 	requests := strings.Split(string(file), ";")
-
 	for _, request := range requests {
 		if strings.Trim(request, " ") == "" {
 			continue
@@ -164,20 +165,30 @@ func (t *tx) ExecScript(sqlScript string) error {
 }
 
 // ============================== modelTx ====================================
-func (m *modelTx) CreateTestRecord(t TestRecord) (string, error) {
-	t.ID = ulidutils.NewID()
-	res, err := m.executor().Exec("INSERT INTO testtable (id) VALUES ($1)", t.ID)
+
+func (m *modelTx) CreateIndex(index Index) (string, error) {
+	if len(index.ID) == 0 {
+		index.ID = ulidutils.NewID()
+	}
+	index.CreatedAt = nowMicrosInUTC()
+	_, err := m.executor().Exec("insert into index (id, format, tags, created_at) values ($1, $2, $3, $4)", index.ID, index.Format, index.Tags, index.CreatedAt)
 	if err != nil {
 		return "", mapError(err)
 	}
-	i, _ := res.RowsAffected()
-	if i == 0 {
-		return "", fmt.Errorf("already exists: %w", errors.ErrExist)
+	return index.ID, nil
+}
+
+func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
+	record.ID = ulidutils.NewID()
+	_, err := m.executor().Exec("insert into index_record (id, index_id, segment, vector) values ($1, $2, $3, $4)", record.ID, record.IndexID, record.Segment, record.Vector)
+	if err != nil {
+		return "", mapError(err)
 	}
-	return t.ID, nil
+	return record.ID, nil
 }
 
 const (
+	PqForeignKeyViolation  = pq.ErrorCode("23503")
 	PqUniqueViolationError = pq.ErrorCode("23505")
 )
 
@@ -190,6 +201,8 @@ func mapError(err error) error {
 	}
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Code {
+		case PqForeignKeyViolation:
+			return errors.ErrConflict
 		case PqUniqueViolationError:
 			return errors.ErrExist
 		}
@@ -219,4 +232,12 @@ func scanRowsQueryResult[T any](rows *sqlx.Rows, total int64) (QueryResult[T], e
 		res = append(res, t)
 	}
 	return QueryResult[T]{Items: res, Total: total}, nil
+}
+
+// "Etc/UTC" makes it compatible with what sql scan returns
+var utcLoc, _ = time.LoadLocation("Etc/UTC")
+
+func nowMicrosInUTC() time.Time {
+	// round to micros to match Postgres precision
+	return time.Now().Round(time.Microsecond).In(utcLoc)
 }

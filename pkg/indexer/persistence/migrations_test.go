@@ -11,14 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
-	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 )
 
-func (p *pureSqlTestSuite) TestMigrations() {
-	assert.NoError(p.T(), migrateUp(p.db.db.DB))
-	assert.NoError(p.T(), migrateDown(p.db.db.DB))
+func (s *pureSqlTestSuite) TestMigrations() {
+	assert.NoError(s.T(), migrateUp(s.db.db.DB))
+	assert.NoError(s.T(), migrateDown(s.db.db.DB))
 }

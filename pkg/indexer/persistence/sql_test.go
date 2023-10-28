@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
@@ -28,10 +29,15 @@ func TestRepositoryTestSuite(t *testing.T) {
 	suite.Run(t, new(pureSqlTestSuite))
 }
 
-func (s *pureSqlTestSuite) TestCreateWorkflow() {
+func (s *pureSqlTestSuite) TestCreateIndexRecord() {
 	mtx := s.db.NewModelTx()
-	tt := TestRecord{}
-	ID, err := mtx.CreateTestRecord(tt)
+	idx := Index{ID: "123", Format: "pdf", Tags: AnyMap{"k": "v"}}
+	ID, err := mtx.CreateIndex(idx)
+	assert.Nil(s.T(), err)
+	assert.NotEqual(s.T(), "", ID)
+
+	rec := IndexRecord{IndexID: "123", Segment: "haha", Vector: AnyMap{"x1": "1", "x2": "2"}}
+	ID, err = mtx.CreateIndexRecord(rec)
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", ID)
 }

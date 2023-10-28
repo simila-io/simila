@@ -11,18 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package server
 
 import (
 	"context"
 	"github.com/acquirecloud/golibs/logging"
+	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/simila-io/simila/pkg/version"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/logrange/linker"
 )
 
-// Run is an entry point of the sauron server
+// Run is an entry point of the Simila server
 func Run(ctx context.Context, cfg *Config) error {
 	log := logging.NewLogger("server")
 	log.Infof("starting server: %s", version.BuildVersionString())
@@ -31,12 +33,12 @@ func Run(ctx context.Context, cfg *Config) error {
 	defer log.Infof("server is stopped")
 
 	// DB
-	//db := persistence.NewDb(cfg.DB.Driver, cfg.DB.SourceName())
-	//migration := persistence.NewMigration(cfg.DB.Driver, cfg.DB.SourceName())
-	//kvsStorage := newKvsStorage(log, cfg)
-	//glProvider := dist.New("simila")
+	db := persistence.NewDb(cfg.DB.Driver, cfg.DB.SourceName())
+	migrations := persistence.NewMigration(cfg.DB.Driver, cfg.DB.SourceName())
 
 	inj := linker.New()
+	inj.Register(linker.Component{Name: "", Value: db})
+	inj.Register(linker.Component{Name: "", Value: migrations})
 
 	inj.Init(ctx)
 	<-ctx.Done()

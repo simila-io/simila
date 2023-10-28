@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
@@ -36,11 +37,14 @@ type (
 	ModelTx interface {
 		Tx
 
-		// CreateTestRecord this is a test call, REMOVE it when everything works
-		CreateTestRecord(t TestRecord) (string, error)
+		// CreateIndex creates index entry
+		CreateIndex(index Index) (string, error)
+
+		// CreateIndexRecord creates index record entry
+		CreateIndexRecord(record IndexRecord) (string, error)
 	}
 
-	// db interface exposes
+	// Db interface exposes
 	Db interface {
 		// NewModelTx creates new ModelTx object
 		NewModelTx() ModelTx

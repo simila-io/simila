@@ -11,11 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package persistence
 
 import (
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types/container"
 	"io"
 	"time"
 
@@ -66,13 +68,15 @@ func newContainerDatabase() (dsProvider, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres",
+		Image:        "groonga/pgroonga:latest-debian-16",
 		ExposedPorts: []string{"5432/tcp"},
-		AutoRemove:   true,
+		HostConfigModifier: func(config *container.HostConfig) {
+			config.AutoRemove = true
+		},
 		Env: map[string]string{
 			"POSTGRES_USER":     "postgres",
 			"POSTGRES_PASSWORD": "postgres",
-			"POSTGRES_DB":       "simila_itest",
+			"POSTGRES_DB":       "simila_test",
 		},
 		WaitingFor: wait.ForListeningPort("5432/tcp"),
 	}
@@ -139,8 +143,8 @@ func (s *SqlTestSuite) TearDownSuite() {
 }
 
 func (s *SqlTestSuite) BeforeTest(suiteName, testName string) {
-	assert.Nil(s.T(), dropCreatePgDb(context.Background(), s.dsp.datasource(), "ariadne_test"))
-	s.db = NewDb("postgres", s.dsp.datasource()+" dbname=ariadne_test").(*db)
+	assert.Nil(s.T(), dropCreatePgDb(context.Background(), s.dsp.datasource(), "simila_test"))
+	s.db = NewDb("postgres", s.dsp.datasource()+" dbname=simila_test").(*db)
 	assert.Nil(s.T(), s.db.Init(context.Background()))
 
 	mtx := s.db.NewTx()

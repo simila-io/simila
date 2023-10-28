@@ -3,9 +3,8 @@ MODULE=github.com/simila-io/simila
 EXEC_NAME=simila
 BUILD_DIR=./build
 TEST_DIR=$(BUILD_DIR)/utests
-BUILD_SRC=./cmd/...
-BUILD_OUT=$(BUILD_DIR)/
-CFGS_DIR=$(shell pwd)/configs
+BUILD_SRC=./cmd/$(EXEC_NAME)
+BUILD_OUT=$(BUILD_DIR)/$(EXEC_NAME)
 # Versioning/build metadata
 VERSION?=$(shell curl -s https://raw.githubusercontent.com/acquirecloud/appversion/main/version.sh | bash -s -- -s)
 REV=$(shell git rev-parse HEAD)
@@ -22,8 +21,6 @@ REGISTRY?=<where we host it>.dkr.ecr.us-east-2.amazonaws.com
 IMAGE_NAME?=$(EXEC_NAME)
 IMAGE_TAG?=$(shell git rev-parse --short HEAD)
 IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
-
-GH_SECRET_FILE = .build.secret
 
 # Help by default
 default: help
@@ -64,15 +61,6 @@ clean: ## clean up, removes the ./build directory
 
 all: clean build
 
-# Github workflow actions linter
-.PHONY: lint-actions
-lint-actions: ## run github action linter
-ifeq (,$(shell command -v actionlint))
-	go install github.com/rhysd/actionlint/cmd/actionlint@latest
-endif
-	@actionlint -version
-	@actionlint
-
 # docker
 .PHONY: docker-build
 docker-build: ## builds the docker image
@@ -91,7 +79,7 @@ db-start: ## start the postgres server locally in docker
 	@mkdir -p testdata/postgres
 	@docker run --rm --name postgres-db -v $(shell pwd)/testdata:/testdata \
 		-v $(shell pwd)/testdata/postgres:/var/lib/postgresql/data \
-		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=simila -d -p 5432:5432 postgres
+		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=simila -d -p 5432:5432 groonga/pgroonga:latest-debian-16
 	@echo "Database started at port 5423"
 
 .PHONY: db-stop
