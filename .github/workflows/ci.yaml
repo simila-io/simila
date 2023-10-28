@@ -41,7 +41,6 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' }}
         uses: codecov/codecov-action@v3
         with:
-          token: ${{ secrets.BUILD_TOKEN }}
           files: coverage.out
           verbose: true
 
