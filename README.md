@@ -8,8 +8,13 @@ Simila search service
 ```bash
 make db-start
 ```
+### 2. Create Simila DB
 
-### 2. Run Simila executable
+```bash
+PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -c "create database simila"
+```
+
+### 3. Run Simila executable
 
 ```bash
 make run
