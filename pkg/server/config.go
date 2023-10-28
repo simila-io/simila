@@ -27,8 +27,9 @@ type (
 	Config struct {
 		// GrpcTransport specifies grpc transport configuration
 		GrpcTransport *transport.Config
-
-		DB *DB
+		// HttpPort defines the port for listening incoming HTTP connections
+		HttpPort int
+		DB       *DB
 	}
 
 	DB struct {
@@ -57,6 +58,7 @@ func (d *DB) URL() string {
 func getDefaultConfig() *Config {
 	return &Config{
 		GrpcTransport: transport.GetDefaultGRPCConfig(),
+		HttpPort:      8080,
 		DB: &DB{
 			Driver:   "postgres",
 			Host:     "localhost",
