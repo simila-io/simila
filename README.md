@@ -1,3 +1,4 @@
+https://github.com/simila-io/simila/actions/workflows/build.yaml/badge.svg
 # simila
 Simila search service
 
