@@ -1,4 +1,4 @@
-![build](https://github.com/simila-io/simila/actions/workflows/build.yaml/badge.svg)
+![Build](https://github.com/simila-io/simila/actions/workflows/build.yaml/badge.svg) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/simila-io/simila/blob/master/LICENSE)
 # simila
 Simila search service
 
