@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches:
-      - master
+      - main
 
 env:
   GOPRIVATE: "github.com/simila-io/*"
