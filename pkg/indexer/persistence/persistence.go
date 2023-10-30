@@ -66,7 +66,7 @@ type (
 		// DeleteIndexRecord deletes index record by ID
 		DeleteIndexRecord(ID string) error
 		// ListIndexRecords lists query matching index record entries
-		ListIndexRecords(query IndexQuery) (*QueryResult[*IndexRecord, string], error)
+		ListIndexRecords(query IndexRecordQuery) (*QueryResult[*IndexRecord, string], error)
 	}
 
 	// Db interface exposes

@@ -259,7 +259,7 @@ func (m *modelTx) DeleteIndexRecord(ID string) error {
 	panic("TODO")
 }
 
-func (m *modelTx) ListIndexRecords(query IndexQuery) (*QueryResult[*IndexRecord, string], error) {
+func (m *modelTx) ListIndexRecords(query IndexRecordQuery) (*QueryResult[*IndexRecord, string], error) {
 	panic("TODO")
 }
 
