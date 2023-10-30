@@ -30,6 +30,14 @@ default: help
 fmt: ## apply fmt to the source code
 	@go fmt ./...
 
+.PHONY: builddeps
+builddeps: ## install dependency tools
+	@go install \
+	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
+	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2 \
+	google.golang.org/protobuf/cmd/protoc-gen-go \
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
 .PHONY: fmt-check
 fmt-check: ## check formatting of the source code
 ifneq (,$(shell gofmt -l .))
@@ -59,7 +67,7 @@ run: build ## builds and runs the server locally: `./build/simila start`
 clean: ## clean up, removes the ./build directory
 	@rm -rf ${BUILD_DIR}
 
-all: clean build
+all: clean builddeps build
 
 # docker
 .PHONY: docker-build

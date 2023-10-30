@@ -12,5 +12,5 @@ clean:
 compile: $(SOURCES:.proto=.go)
 
 %.go:%.proto
-	@DIR=$(shell dirname $^);RESDIR=protogen/;mkdir -p $$RESDIR;\
-	FNAME=$(shell basename $^);$(PROTOC) -I $$DIR  --go-grpc_out=$$RESDIR --go_out=$$RESDIR $$FNAME
+	@DIR=$(shell dirname $^);RESDIR=gen/;mkdir -p $$RESDIR;\
+	FNAME=$(shell basename $^);$(PROTOC) -I $$DIR -I include/ --grpc-gateway_out $$RESDIR $$FNAME

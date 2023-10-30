@@ -4,6 +4,16 @@ Simila search service
 
 ## Quick start
 
+### 0. build deps
+run locally or let's add it to Makefile?
+```bash
+go install \
+github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
+github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2 \
+google.golang.org/protobuf/cmd/protoc-gen-go \
+google.golang.org/grpc/cmd/protoc-gen-go-grpc
+```
+
 ### 1. Run DB docker
 
 ```bash

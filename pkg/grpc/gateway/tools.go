@@ -4,36 +4,21 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package api
+//go:build gateway
+// +build gateway
+
+package gateway
 
 import (
-	"github.com/acquirecloud/golibs/logging"
-	"github.com/gin-gonic/gin"
-	"net/http"
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway"
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+	_ "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+	_ "google.golang.org/protobuf/cmd/protoc-gen-go"
 )
-
-// HttpEP provides the api endpoints for the HTTP interface
-type HttpEP struct {
-	logger logging.Logger
-}
-
-func NewHttpEP() *HttpEP {
-	return &HttpEP{logger: logging.NewLogger("api.rest")}
-}
-
-func (hep *HttpEP) RegisterEPs(g *gin.Engine) error {
-	g.GET("/v1/ping", hep.hGetPing)
-	return nil
-}
-
-func (hep *HttpEP) hGetPing(c *gin.Context) {
-	hep.logger.Debugf("ping")
-	c.String(http.StatusOK, "pong")
-}

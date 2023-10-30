@@ -15,7 +15,7 @@ package api
 
 import (
 	"context"
-	"github.com/simila-io/simila/api/grpc/protogen/v1/index"
+	"github.com/simila-io/simila/api/gen/index/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
