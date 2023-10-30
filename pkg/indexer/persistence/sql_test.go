@@ -31,13 +31,18 @@ func TestRepositoryTestSuite(t *testing.T) {
 
 func (s *pureSqlTestSuite) TestCreateIndexRecord() {
 	mtx := s.db.NewModelTx()
-	idx := Index{ID: "123", Format: "pdf", Tags: AnyMap{"k": "v"}}
-	ID, err := mtx.CreateIndex(idx)
+	frmt := Format{Name: "pdf", Basis: AnyMap{"d1": "1", "d2": "2"}}
+	frmtID, err := mtx.CreateFormat(frmt)
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", ID)
+	assert.NotEqual(s.T(), "", frmtID)
 
-	rec := IndexRecord{IndexID: "123", Segment: "haha", Vector: AnyMap{"x1": "1", "x2": "2"}}
-	ID, err = mtx.CreateIndexRecord(rec)
+	idx := Index{ID: "123", Format: frmt.Name, Tags: AnyMap{"k": "v"}}
+	idxID, err := mtx.CreateIndex(idx)
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", ID)
+	assert.NotEqual(s.T(), "", idxID)
+
+	rec := IndexRecord{IndexID: idxID, Segment: "haha", Vector: AnyMap{"x1": "1", "x2": "2"}}
+	recID, err := mtx.CreateIndexRecord(rec)
+	assert.Nil(s.T(), err)
+	assert.NotEqual(s.T(), "", recID)
 }

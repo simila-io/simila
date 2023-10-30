@@ -15,8 +15,11 @@
 package persistence
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha1"
 	"database/sql"
+	"encoding/gob"
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
@@ -156,8 +159,7 @@ func (t *tx) ExecScript(sqlScript string) error {
 		if strings.Trim(request, " ") == "" {
 			continue
 		}
-		err := t.execQuery(request)
-		if err != nil {
+		if err = t.execQuery(request); err != nil {
 			return fmt.Errorf("could not execute %s in ExecScript: %w", request, err)
 		}
 	}
@@ -166,12 +168,28 @@ func (t *tx) ExecScript(sqlScript string) error {
 
 // ============================== modelTx ====================================
 
-func (m *modelTx) CreateIndex(index Index) (string, error) {
-	if len(index.ID) == 0 {
-		index.ID = ulidutils.NewID()
+func (m *modelTx) CreateFormat(format Format) (string, error) {
+	format.ID = newID()
+	format.CreatedAt = time.Now()
+	format.UpdatedAt = format.CreatedAt
+	_, err := m.executor().Exec("insert into format (id, name, basis, created_at, updated_at) values ($1, $2, $3, $4, $5)",
+		format.ID, format.Name, format.Basis, format.CreatedAt, format.UpdatedAt)
+	if err != nil {
+		return "", mapError(err)
 	}
-	index.CreatedAt = nowMicrosInUTC()
-	_, err := m.executor().Exec("insert into index (id, format, tags, created_at) values ($1, $2, $3, $4)", index.ID, index.Format, index.Tags, index.CreatedAt)
+	return format.ID, nil
+}
+
+func (m *modelTx) CreateIndex(index Index) (string, error) {
+	id, err := newIndexID(index)
+	if err != nil {
+		return "", err
+	}
+	index.ID = id
+	index.CreatedAt = time.Now()
+	index.UpdatedAt = index.CreatedAt
+	_, err = m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
+		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
 	if err != nil {
 		return "", mapError(err)
 	}
@@ -179,8 +197,15 @@ func (m *modelTx) CreateIndex(index Index) (string, error) {
 }
 
 func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
-	record.ID = ulidutils.NewID()
-	_, err := m.executor().Exec("insert into index_record (id, index_id, segment, vector) values ($1, $2, $3, $4)", record.ID, record.IndexID, record.Segment, record.Vector)
+	id, err := newRecordID(record)
+	if err != nil {
+		return "", err
+	}
+	record.ID = id
+	record.CreatedAt = time.Now()
+	record.UpdatedAt = record.CreatedAt
+	_, err = m.executor().Exec("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ($1, $2, $3, $4, $5, $6)",
+		record.ID, record.IndexID, record.Segment, record.Vector, record.CreatedAt, record.UpdatedAt)
 	if err != nil {
 		return "", mapError(err)
 	}
@@ -188,8 +213,8 @@ func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
 }
 
 const (
-	PqForeignKeyViolation  = pq.ErrorCode("23503")
-	PqUniqueViolationError = pq.ErrorCode("23505")
+	PqForeignKeyViolationError = pq.ErrorCode("23503")
+	PqUniqueViolationError     = pq.ErrorCode("23505")
 )
 
 func mapError(err error) error {
@@ -201,7 +226,7 @@ func mapError(err error) error {
 	}
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Code {
-		case PqForeignKeyViolation:
+		case PqForeignKeyViolationError:
 			return errors.ErrConflict
 		case PqUniqueViolationError:
 			return errors.ErrExist
@@ -234,10 +259,34 @@ func scanRowsQueryResult[T any](rows *sqlx.Rows, total int64) (QueryResult[T], e
 	return QueryResult[T]{Items: res, Total: total}, nil
 }
 
-// "Etc/UTC" makes it compatible with what sql scan returns
-var utcLoc, _ = time.LoadLocation("Etc/UTC")
+func mustEncode(v any) []byte {
+	var bb bytes.Buffer
+	enc := gob.NewEncoder(&bb)
+	if err := enc.Encode(v); err != nil {
+		panic(err)
+	}
+	return bb.Bytes()
+}
 
-func nowMicrosInUTC() time.Time {
-	// round to micros to match Postgres precision
-	return time.Now().Round(time.Microsecond).In(utcLoc)
+func newID() string {
+	return fmt.Sprintf("%x", ulidutils.New().Bytes())
+}
+
+func newIndexID(index Index) (string, error) {
+	if len(index.ID) == 0 {
+		return "", fmt.Errorf("new index ID must must be specified: %w", errors.ErrInvalid)
+	}
+	hSum := sha1.Sum([]byte(index.ID))
+	return fmt.Sprintf("%x", hSum), nil
+}
+
+func newRecordID(record IndexRecord) (string, error) {
+	if len(record.IndexID) == 0 || len(record.Vector) == 0 {
+		return "", fmt.Errorf("new record indexID and vector must be specified: %w", errors.ErrInvalid)
+	}
+	var bb bytes.Buffer
+	bb.WriteString(record.IndexID)
+	bb.Write(mustEncode(record.Vector))
+	hSum := sha1.Sum(bb.Bytes())
+	return fmt.Sprintf("%x", hSum), nil
 }

@@ -37,6 +37,9 @@ type (
 	ModelTx interface {
 		Tx
 
+		// CreateFormat creates index format entry
+		CreateFormat(format Format) (string, error)
+
 		// CreateIndex creates index entry
 		CreateIndex(index Index) (string, error)
 

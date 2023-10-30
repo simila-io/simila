@@ -24,18 +24,29 @@ import (
 type (
 	AnyMap map[string]any
 
+	Format struct {
+		ID        string    `db:"id"`
+		Name      string    `db:"name"`
+		Basis     AnyMap    `db:"basis"`
+		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
+	}
+
 	Index struct {
 		ID        string    `db:"id"`
 		Format    string    `db:"format"`
 		Tags      AnyMap    `db:"tags"`
 		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
 	}
 
 	IndexRecord struct {
-		ID      string `db:"id"`
-		IndexID string `db:"index_id"`
-		Segment string `db:"segment"`
-		Vector  AnyMap `db:"vector"`
+		ID        string    `db:"id"`
+		IndexID   string    `db:"index_id"`
+		Segment   string    `db:"segment"`
+		Vector    AnyMap    `db:"vector"`
+		CreatedAt time.Time `db:"created_at"`
+		UpdatedAt time.Time `db:"updated_at"`
 	}
 
 	QueryResult[T any] struct {
