@@ -17,7 +17,6 @@ package persistence
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
 	"database/sql"
 	"encoding/gob"
 	"fmt"
@@ -180,12 +179,31 @@ func (m *modelTx) CreateFormat(format Format) (string, error) {
 	return format.ID, nil
 }
 
-func (m *modelTx) CreateIndex(index Index) (string, error) {
-	id, err := newIndexID(index)
+// GetFormat retrieves format entry by name
+func (m *modelTx) GetFormat(name string) (*Format, error) {
+	panic("TODO")
+}
+
+// DeleteFormat deletes format entry by name (only if not referenced)
+func (m *modelTx) DeleteFormat(name string) error {
+	panic("TODO")
+}
+
+// ListFormats lists all the existing format entries
+func (m *modelTx) ListFormats() ([]*Format, error) {
+	panic("TODO")
+}
+
+func (m *modelTx) CreateIndex(sourceID string, index Index) (string, error) {
+	id, err := IndexID(sourceID)
 	if err != nil {
 		return "", err
 	}
+	if index.Tags == nil {
+		index.Tags = make(StrStrMap)
+	}
 	index.ID = id
+	index.Tags[SourceIDTag] = sourceID
 	index.CreatedAt = time.Now()
 	index.UpdatedAt = index.CreatedAt
 	_, err = m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
@@ -196,8 +214,28 @@ func (m *modelTx) CreateIndex(index Index) (string, error) {
 	return index.ID, nil
 }
 
+// GetIndex retrieves index info by ID
+func (m *modelTx) GetIndex(ID string) (*Index, error) {
+	panic("TODO")
+}
+
+// UpdateIndex updates index info
+func (m *modelTx) UpdateIndex(index Index) (*Index, error) {
+	panic("TODO")
+}
+
+// DeleteIndex deletes index entry and all the related records
+func (m *modelTx) DeleteIndex(ID string) error {
+	panic("TODO")
+}
+
+// ListIndexes lists query matching index entries
+func (m *modelTx) ListIndexes(query IndexQuery) (*QueryResult[*Index, string], error) {
+	panic("TODO")
+}
+
 func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
-	id, err := newRecordID(record)
+	id, err := RecordID(record.IndexID, record.Vector)
 	if err != nil {
 		return "", err
 	}
@@ -211,6 +249,24 @@ func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
 	}
 	return record.ID, nil
 }
+
+func (m *modelTx) GetIndexRecord(ID string) (*IndexRecord, error) {
+	panic("TODO")
+}
+
+func (m *modelTx) UpdateIndexRecord(record IndexRecord) (*IndexRecord, error) {
+	panic("TODO")
+}
+
+func (m *modelTx) DeleteIndexRecord(ID string) error {
+	panic("TODO")
+}
+
+func (m *modelTx) ListIndexRecords(query IndexQuery) (*QueryResult[*IndexRecord, string], error) {
+	panic("TODO")
+}
+
+// ============================== helpers ====================================
 
 const (
 	PqForeignKeyViolationError = pq.ErrorCode("23503")
@@ -227,9 +283,9 @@ func mapError(err error) error {
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Code {
 		case PqForeignKeyViolationError:
-			return errors.ErrConflict
+			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrNotExist)
 		case PqUniqueViolationError:
-			return errors.ErrExist
+			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrExist)
 		}
 	}
 	return err
@@ -247,16 +303,17 @@ func scanRows[T any](rows *sqlx.Rows) ([]T, error) {
 	return res, nil
 }
 
-func scanRowsQueryResult[T any](rows *sqlx.Rows, total int64) (QueryResult[T], error) {
+func scanRowsQueryResult[T, N any](rows *sqlx.Rows, nextIDFn func(res []T) N, total int64) (QueryResult[T, N], error) {
 	var res []T
 	for rows.Next() {
 		var t T
 		if err := rows.StructScan(&t); err != nil {
-			return QueryResult[T]{}, mapError(err)
+			return QueryResult[T, N]{}, mapError(err)
 		}
 		res = append(res, t)
 	}
-	return QueryResult[T]{Items: res, Total: total}, nil
+	return QueryResult[T, N]{Items: res,
+		NextID: nextIDFn(res), Total: total}, nil
 }
 
 func mustEncode(v any) []byte {
@@ -270,23 +327,4 @@ func mustEncode(v any) []byte {
 
 func newID() string {
 	return fmt.Sprintf("%x", ulidutils.New().Bytes())
-}
-
-func newIndexID(index Index) (string, error) {
-	if len(index.ID) == 0 {
-		return "", fmt.Errorf("new index ID must must be specified: %w", errors.ErrInvalid)
-	}
-	hSum := sha1.Sum([]byte(index.ID))
-	return fmt.Sprintf("%x", hSum), nil
-}
-
-func newRecordID(record IndexRecord) (string, error) {
-	if len(record.IndexID) == 0 || len(record.Vector) == 0 {
-		return "", fmt.Errorf("new record indexID and vector must be specified: %w", errors.ErrInvalid)
-	}
-	var bb bytes.Buffer
-	bb.WriteString(record.IndexID)
-	bb.Write(mustEncode(record.Vector))
-	hSum := sha1.Sum(bb.Bytes())
-	return fmt.Sprintf("%x", hSum), nil
 }

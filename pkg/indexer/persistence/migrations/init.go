@@ -49,7 +49,7 @@ create index if not exists "idx_index_created_at" on "index" ("created_at");
 create table if not exists "index_record"
 (
     "id"          varchar(64)  not null,
-    "index_id"    varchar(64)  not null references "index" ("id") on delete restrict,
+    "index_id"    varchar(64)  not null references "index" ("id") on delete cascade,
     "segment"     text         not null,
     "vector"   	  jsonb        not null default '{}'::jsonb,
     "created_at"  timestamp with time zone not null default (now() at time zone 'utc'),

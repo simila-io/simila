@@ -15,19 +15,26 @@
 package persistence
 
 import (
+	"bytes"
+	"crypto/sha1"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"github.com/acquirecloud/golibs/errors"
 	"time"
 )
 
+const (
+	SourceIDTag = "__sourceID__"
+)
+
 type (
-	AnyMap map[string]any
+	StrStrMap map[string]string
 
 	Format struct {
 		ID        string    `db:"id"`
 		Name      string    `db:"name"`
-		Basis     AnyMap    `db:"basis"`
+		Basis     StrStrMap `db:"basis"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
@@ -35,31 +42,73 @@ type (
 	Index struct {
 		ID        string    `db:"id"`
 		Format    string    `db:"format"`
-		Tags      AnyMap    `db:"tags"`
+		Tags      StrStrMap `db:"tags"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
+	}
+
+	IndexQuery struct {
+		Format        string
+		Tags          StrStrMap
+		CreatedAfter  time.Time
+		CreatedBefore time.Time
+		FromID        string
+		Limit         int
 	}
 
 	IndexRecord struct {
 		ID        string    `db:"id"`
 		IndexID   string    `db:"index_id"`
 		Segment   string    `db:"segment"`
-		Vector    AnyMap    `db:"vector"`
+		Vector    StrStrMap `db:"vector"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
-	QueryResult[T any] struct {
-		Items []T
-		Total int64
+	IndexRecordQuery struct {
+		IndexIDs      []string
+		Tags          StrStrMap // index tags
+		Query         string    // underlying search engine query
+		Distinct      bool      // if true, returns at most 1 result per index
+		CreatedAfter  time.Time
+		CreatedBefore time.Time
+		FromID        string
+		Limit         int
+	}
+
+	QueryResult[T any, N any] struct {
+		Items  []T
+		NextID N
+		Total  int64
 	}
 )
 
-func (m AnyMap) Value() (value driver.Value, err error) {
+// IndexID converts external document ID to index ID
+func IndexID(sourceID string) (string, error) {
+	if len(sourceID) == 0 {
+		return "", fmt.Errorf("sourceID must be specified: %w", errors.ErrInvalid)
+	}
+	hSum := sha1.Sum([]byte(sourceID))
+	return fmt.Sprintf("%x", hSum), nil
+}
+
+// RecordID converts a tuple of (index ID, record vector) to index record ID
+func RecordID(indexID string, vector StrStrMap) (string, error) {
+	if len(indexID) == 0 || len(vector) == 0 {
+		return "", fmt.Errorf("indexID and record vector must be specified: %w", errors.ErrInvalid)
+	}
+	var bb bytes.Buffer
+	bb.WriteString(indexID)
+	bb.Write(mustEncode(vector))
+	hSum := sha1.Sum(bb.Bytes())
+	return fmt.Sprintf("%x", hSum), nil
+}
+
+func (m StrStrMap) Value() (value driver.Value, err error) {
 	return json.Marshal(m)
 }
 
-func (m *AnyMap) Scan(value any) error {
+func (m *StrStrMap) Scan(value any) error {
 	b, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("unexpected value in scan")
