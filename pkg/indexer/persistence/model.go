@@ -24,10 +24,6 @@ import (
 	"time"
 )
 
-const (
-	SourceIDTag = "__sourceID__"
-)
-
 type (
 	StrStrMap map[string]string
 
@@ -82,15 +78,6 @@ type (
 		Total  int64
 	}
 )
-
-// IndexID converts external document ID to index ID
-func IndexID(sourceID string) (string, error) {
-	if len(sourceID) == 0 {
-		return "", fmt.Errorf("sourceID must be specified: %w", errors.ErrInvalid)
-	}
-	hSum := sha1.Sum([]byte(sourceID))
-	return fmt.Sprintf("%x", hSum), nil
-}
 
 // RecordID converts a tuple of (index ID, record vector) to index record ID
 func RecordID(indexID string, vector StrStrMap) (string, error) {

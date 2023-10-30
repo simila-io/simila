@@ -194,19 +194,16 @@ func (m *modelTx) ListFormats() ([]*Format, error) {
 	panic("TODO")
 }
 
-func (m *modelTx) CreateIndex(sourceID string, index Index) (string, error) {
-	id, err := IndexID(sourceID)
-	if err != nil {
-		return "", err
+func (m *modelTx) CreateIndex(index Index) (string, error) {
+	if len(index.ID) == 0 {
+		return "", fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
 	}
 	if index.Tags == nil {
 		index.Tags = make(StrStrMap)
 	}
-	index.ID = id
-	index.Tags[SourceIDTag] = sourceID
 	index.CreatedAt = time.Now()
 	index.UpdatedAt = index.CreatedAt
-	_, err = m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
+	_, err := m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
 		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
 	if err != nil {
 		return "", mapError(err)

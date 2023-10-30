@@ -36,8 +36,8 @@ func (s *pureSqlTestSuite) TestCreateIndexRecord() {
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", frmtID)
 
-	idx := Index{Format: frmt.Name, Tags: StrStrMap{"k": "v"}}
-	idxID, err := mtx.CreateIndex("123", idx)
+	idx := Index{ID: "abc.txt", Format: frmt.Name, Tags: StrStrMap{"k": "v"}}
+	idxID, err := mtx.CreateIndex(idx)
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", idxID)
 
