@@ -2,18 +2,12 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
 
 package index.v1;
 option go_package = "./index/v1;index";
 
 service Service {
-  rpc Create(CreateIndexRequest) returns (google.protobuf.Empty){
-    option (google.api.http) = {
-      post: "/v1/indexes"
-      body: "*"
-    };
-  }
+  rpc Create(CreateIndexRequest) returns (google.protobuf.Empty);
 }
 
 message CreateIndexRequest {
