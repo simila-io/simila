@@ -40,33 +40,38 @@ type (
 		// CreateFormat creates format entry
 		CreateFormat(format Format) (string, error)
 		// GetFormat retrieves format entry by name
-		GetFormat(name string) (*Format, error)
+		GetFormat(name string) (Format, error)
 		// DeleteFormat deletes format entry by name (only if not referenced)
 		DeleteFormat(name string) error
 		// ListFormats lists all the existing format entries
-		ListFormats() ([]*Format, error)
+		ListFormats() ([]Format, error)
 
 		// CreateIndex creates index entry based on source ID
 		CreateIndex(index Index) (string, error)
 		// GetIndex retrieves index info by ID
-		GetIndex(ID string) (*Index, error)
+		GetIndex(ID string) (Index, error)
 		// UpdateIndex updates index info
-		UpdateIndex(index Index) (*Index, error)
+		UpdateIndex(index Index) error
 		// DeleteIndex deletes index entry and all the related records
 		DeleteIndex(ID string) error
-		// ListIndexes lists query matching index entries
-		ListIndexes(query IndexQuery) (*QueryResult[*Index, string], error)
+		// QueryIndexes lists query matching index entries
+		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
 
 		// CreateIndexRecord creates index record entry
 		CreateIndexRecord(record IndexRecord) (string, error)
 		// GetIndexRecord retrieves index record entry by ID
-		GetIndexRecord(ID string) (*IndexRecord, error)
+		GetIndexRecord(ID string) (IndexRecord, error)
 		// UpdateIndexRecord updates index record
-		UpdateIndexRecord(record IndexRecord) (*IndexRecord, error)
+		UpdateIndexRecord(record IndexRecord) error
 		// DeleteIndexRecord deletes index record by ID
 		DeleteIndexRecord(ID string) error
-		// ListIndexRecords lists query matching index record entries
-		ListIndexRecords(query IndexRecordQuery) (*QueryResult[*IndexRecord, string], error)
+		// QueryIndexRecords lists query matching index record entries
+		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
+
+		// Search performs full text search across existing index records
+		// the query string should be formed in accordance with the pgroonga manual
+		// for the `&@~` operator (https://pgroonga.github.io/reference/operators/query-v2.html)
+		Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error)
 	}
 
 	// Db interface exposes

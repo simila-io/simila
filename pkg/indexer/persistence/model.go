@@ -81,13 +81,24 @@ type (
 
 	IndexRecordQuery struct {
 		IndexIDs      []string
-		Tags          Tags   // index tags
-		Query         string // underlying search engine query
-		Distinct      bool   // if true, returns at most 1 result per index
 		CreatedAfter  time.Time
 		CreatedBefore time.Time
 		FromID        string
 		Limit         int
+	}
+
+	SearchQuery struct {
+		IndexIDs []string
+		Query    string // underlying search engine query
+		Tags     Tags   // index tags
+		Distinct *bool  // if true, returns at most 1 result per index
+		FromID   string
+		Limit    int
+	}
+
+	SearchQueryResultItem struct {
+		IndexRecord
+		Score int
 	}
 
 	QueryResult[T any, N any] struct {
@@ -135,34 +146,41 @@ func NewBasis(dims ...Dimension) (Basis, error) {
 }
 
 func NewVector(basis Basis, comps ...Component) (Vector, error) {
-	if len(comps) != len(basis) {
-		return Vector{}, fmt.Errorf("# of vector components=%d must match # of basis dimensions=%d: %w",
-			len(comps), len(basis), errors.ErrInvalid)
-	}
-	for i := 0; i < len(comps); i++ {
-		if basis[i].Type != DType(comps[i]) {
-			return Vector{}, fmt.Errorf("component=%q type does not match the basis dimension=%v type: %w",
-				comps[i], basis[i], errors.ErrInvalid)
-		}
-		switch DType(comps[i]) {
-		case DTypeString:
-			v := comps[i].(string)
-			if int64(len(v)) < basis[i].Min || int64(len(v)) > basis[i].Max {
-				return Vector{}, fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
-					comps[i], basis[i], errors.ErrInvalid)
-			}
-		case DTypeNumber:
-			v := int64(comps[i].(float64))
-			if v < basis[i].Min || v > basis[i].Max {
-				return Vector{}, fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
-					comps[i], basis[i], errors.ErrInvalid)
-			}
-		default:
-			return Vector{}, fmt.Errorf("unknown component=%q type=%s: %w",
-				comps[i], DType(comps[i]), errors.ErrInvalid)
-		}
+	if err := CheckVector(basis, comps); err != nil {
+		return Vector{}, err
 	}
 	return comps, nil
+}
+
+func CheckVector(basis Basis, vector Vector) error {
+	if len(vector) != len(basis) {
+		return fmt.Errorf("# of vector components=%d must match # of basis dimensions=%d: %w",
+			len(vector), len(basis), errors.ErrInvalid)
+	}
+	for i := 0; i < len(vector); i++ {
+		if basis[i].Type != DType(vector[i]) {
+			return fmt.Errorf("component=%q type does not match the basis dimension=%v type: %w",
+				vector[i], basis[i], errors.ErrInvalid)
+		}
+		switch DType(vector[i]) {
+		case DTypeString:
+			v := vector[i].(string)
+			if int64(len(v)) < basis[i].Min || int64(len(v)) > basis[i].Max {
+				return fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
+					vector[i], basis[i], errors.ErrInvalid)
+			}
+		case DTypeNumber:
+			v := int64(vector[i].(float64))
+			if v < basis[i].Min || v > basis[i].Max {
+				return fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
+					vector[i], basis[i], errors.ErrInvalid)
+			}
+		default:
+			return fmt.Errorf("unknown component=%q type=%s: %w",
+				vector[i], DType(vector[i]), errors.ErrInvalid)
+		}
+	}
+	return nil
 }
 
 func (v Vector) Value() (value driver.Value, err error) {

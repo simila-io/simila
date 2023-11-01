@@ -23,7 +23,7 @@ import (
 	"github.com/acquirecloud/golibs/ulidutils"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 )
@@ -146,7 +146,7 @@ func (t *tx) execQuery(sqlQuery string, params ...interface{}) error {
 
 // ExecScript runs the sqlScript (file name)
 func (t *tx) ExecScript(sqlScript string) error {
-	file, err := ioutil.ReadFile(sqlScript)
+	file, err := os.ReadFile(sqlScript)
 	if err != nil {
 		return fmt.Errorf("could not read %s in ExecScript: %w", sqlScript, err)
 	}
@@ -180,19 +180,30 @@ func (m *modelTx) CreateFormat(format Format) (string, error) {
 	return format.ID, nil
 }
 
-// GetFormat retrieves format entry by name
-func (m *modelTx) GetFormat(name string) (*Format, error) {
-	panic("TODO")
+func (m *modelTx) GetFormat(name string) (Format, error) {
+	var f Format
+	return f, mapError(m.executor().Get(&f, "select * from format where name=$1", name))
 }
 
-// DeleteFormat deletes format entry by name (only if not referenced)
 func (m *modelTx) DeleteFormat(name string) error {
-	panic("TODO")
+	res, err := m.executor().Exec("delete from format where name=$1", name)
+	if err != nil {
+		return mapError(err)
+	}
+	cnt, _ := res.RowsAffected()
+	if cnt == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
 }
 
-// ListFormats lists all the existing format entries
-func (m *modelTx) ListFormats() ([]*Format, error) {
-	panic("TODO")
+func (m *modelTx) ListFormats() ([]Format, error) {
+	rows, err := m.executor().Queryx("select * from format order by name")
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+	return scanRows[Format](rows)
 }
 
 func (m *modelTx) CreateIndex(index Index) (string, error) {
@@ -212,24 +223,126 @@ func (m *modelTx) CreateIndex(index Index) (string, error) {
 	return index.ID, nil
 }
 
-// GetIndex retrieves index info by ID
-func (m *modelTx) GetIndex(ID string) (*Index, error) {
-	panic("TODO")
+func (m *modelTx) GetIndex(ID string) (Index, error) {
+	var idx Index
+	return idx, mapError(m.executor().Get(&idx, "select * from index where id=$1", ID))
 }
 
-// UpdateIndex updates index info
-func (m *modelTx) UpdateIndex(index Index) (*Index, error) {
-	panic("TODO")
+func (m *modelTx) UpdateIndex(index Index) error {
+	if len(index.ID) == 0 {
+		return fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("update index set")
+
+	args := make([]any, 0)
+	if len(index.Tags) > 0 {
+		sb.WriteString(" tags = ?")
+		args = append(args, index.Tags)
+	}
+	if len(args) == 0 {
+		return nil
+	}
+
+	sb.WriteString(", updated_at = ? where id = ?")
+	args = append(args, time.Now(), index.ID)
+
+	res, err := m.executor().Exec(sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	if err != nil {
+		return mapError(err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
 }
 
-// DeleteIndex deletes index entry and all the related records
 func (m *modelTx) DeleteIndex(ID string) error {
-	panic("TODO")
+	res, err := m.executor().Exec("delete from index where id=$1", ID)
+	if err != nil {
+		return mapError(err)
+	}
+	cnt, _ := res.RowsAffected()
+	if cnt == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
 }
 
-// ListIndexes lists query matching index entries
-func (m *modelTx) ListIndexes(query IndexQuery) (*QueryResult[*Index, string], error) {
-	panic("TODO")
+func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], error) {
+	sb := strings.Builder{}
+	args := make([]any, 0)
+
+	if len(query.FromID) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" id >= ? ")
+		args = append(args, query.FromID)
+	}
+	if len(query.Format) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" format = ? ")
+		args = append(args, query.Format)
+	}
+	if len(query.Tags) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		var tb strings.Builder
+		tb.WriteString(" {")
+		for k, v := range query.Tags {
+			if tb.Len() > 2 {
+				tb.WriteByte(',')
+			}
+			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
+		}
+		tb.WriteString("}")
+		sb.WriteString(" tags @> ?")
+		args = append(args, tb.String())
+	}
+	if !query.CreatedBefore.IsZero() {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" created_at < ? ")
+		args = append(args, query.CreatedBefore)
+	}
+	if !query.CreatedAfter.IsZero() {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" created_at > ? ")
+		args = append(args, query.CreatedAfter)
+	}
+
+	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
+	total, err := m.getCount(fmt.Sprintf("select count(*) from index where %s", where), args...)
+	if err != nil {
+		return QueryResult[Index, string]{}, mapError(err)
+	}
+	if query.Limit <= 0 {
+		return QueryResult[Index, string]{Total: total}, nil
+	}
+	args = append(args, query.Limit+1)
+	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index where %s order by id limit $%d", where, len(args)), args...)
+	if err != nil {
+		return QueryResult[Index, string]{Total: total}, mapError(err)
+	}
+	res, err := scanRowsQueryResult[Index](rows)
+	if err != nil {
+		return QueryResult[Index, string]{}, mapError(err)
+	}
+	var nextID string
+	if len(res) > query.Limit {
+		nextID = res[len(res)-1].ID
+		res = res[:query.Limit]
+	}
+	return QueryResult[Index, string]{Items: res, NextID: nextID, Total: total}, nil
 }
 
 func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
@@ -249,24 +362,223 @@ func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
 	return record.ID, nil
 }
 
-func (m *modelTx) GetIndexRecord(ID string) (*IndexRecord, error) {
+func (m *modelTx) GetIndexRecord(ID string) (IndexRecord, error) {
 	var r IndexRecord
-	if err := m.executor().Get(&r, "select * FROM index_record WHERE id=$1", ID); err != nil {
-		return nil, mapError(err)
-	}
-	return &r, nil
+	return r, mapError(m.executor().Get(&r, "select * FROM index_record WHERE id=$1", ID))
 }
 
-func (m *modelTx) UpdateIndexRecord(record IndexRecord) (*IndexRecord, error) {
-	panic("TODO")
+func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
+	if len(record.ID) == 0 {
+		return fmt.Errorf("index record ID must be specified: %w", errors.ErrInvalid)
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("update index_record set")
+
+	args := make([]interface{}, 0)
+	if len(record.Segment) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(" segment = ?")
+		args = append(args, record.Segment)
+	}
+	if len(record.Vector) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(" vector = ?")
+		args = append(args, record.Vector)
+	}
+	if len(args) == 0 {
+		return nil
+	}
+
+	sb.WriteString(", updated_at = ? where id = ?")
+	args = append(args, time.Now(), record.ID)
+
+	res, err := m.executor().Exec(sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	if err != nil {
+		return mapError(err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
 }
 
 func (m *modelTx) DeleteIndexRecord(ID string) error {
-	panic("TODO")
+	res, err := m.executor().Exec("delete from index_record where id=$1", ID)
+	if err != nil {
+		return mapError(err)
+	}
+	cnt, _ := res.RowsAffected()
+	if cnt == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
 }
 
-func (m *modelTx) ListIndexRecords(query IndexRecordQuery) (*QueryResult[*IndexRecord, string], error) {
-	panic("TODO")
+func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error) {
+	sb := strings.Builder{}
+	args := make([]any, 0)
+
+	if len(query.FromID) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" id >= ? ")
+		args = append(args, query.FromID)
+	}
+	if len(query.IndexIDs) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		oldLen := len(args)
+		sb.WriteString(" index_id in ( ")
+		for _, id := range query.IndexIDs {
+			if len(args) > oldLen {
+				sb.WriteString(", ")
+			}
+			sb.WriteString("?")
+			args = append(args, id)
+		}
+		sb.WriteString(")")
+	}
+	if !query.CreatedBefore.IsZero() {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" created_at < ? ")
+		args = append(args, query.CreatedBefore)
+	}
+	if !query.CreatedAfter.IsZero() {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" created_at > ? ")
+		args = append(args, query.CreatedAfter)
+	}
+
+	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
+	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record where %s ", where), args...)
+	if err != nil {
+		return QueryResult[IndexRecord, string]{}, mapError(err)
+	}
+	if query.Limit <= 0 {
+		return QueryResult[IndexRecord, string]{Total: total}, nil
+	}
+	args = append(args, query.Limit+1)
+	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index_record where %s order by id limit $%d", where, len(args)), args...)
+	if err != nil {
+		return QueryResult[IndexRecord, string]{Total: total}, mapError(err)
+	}
+	res, err := scanRowsQueryResult[IndexRecord](rows)
+	if err != nil {
+		return QueryResult[IndexRecord, string]{}, mapError(err)
+	}
+	var nextID string
+	if len(res) > query.Limit {
+		nextID = res[len(res)-1].ID
+		res = res[:query.Limit]
+	}
+	return QueryResult[IndexRecord, string]{Items: res, NextID: nextID, Total: total}, nil
+}
+
+func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error) {
+	if len(query.Query) == 0 {
+		return QueryResult[SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
+	}
+
+	sb := strings.Builder{}
+	args := make([]any, 0)
+
+	if len(query.FromID) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" index_record.id >= ? ")
+		args = append(args, query.FromID)
+	}
+	if len(query.IndexIDs) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		oldLen := len(args)
+		sb.WriteString(" index_record.index_id in ( ")
+		for _, id := range query.IndexIDs {
+			if len(args) > oldLen {
+				sb.WriteString(", ")
+			}
+			sb.WriteString("?")
+			args = append(args, id)
+		}
+		sb.WriteString(")")
+	}
+	if len(query.Tags) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		var tb strings.Builder
+		tb.WriteString(" {")
+		for k, v := range query.Tags {
+			if tb.Len() > 2 {
+				tb.WriteByte(',')
+			}
+			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
+		}
+		tb.WriteString("}")
+		sb.WriteString(" index.tags @> ?")
+		args = append(args, tb.String())
+	}
+	if len(query.Query) > 0 {
+		if len(args) > 0 {
+			sb.WriteString(" and ")
+		}
+		sb.WriteString(" index_record.segment &@~ ? ")
+		args = append(args, query.Query)
+	}
+
+	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
+	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record inner join index on index.id = index_record.index_id where %s ", where), args...)
+	if err != nil {
+		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
+	}
+	if query.Limit <= 0 {
+		return QueryResult[SearchQueryResultItem, string]{Total: total}, nil
+	}
+	args = append(args, query.Limit+1)
+	rows, err := m.executor().Queryx(fmt.Sprintf("select index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+		"inner join index on index.id = index_record.index_id where %s order by score desc, id asc limit $%d", where, len(args)), args...)
+	if err != nil {
+		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
+	}
+	res, err := scanRowsQueryResult[SearchQueryResultItem](rows)
+	if err != nil {
+		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
+	}
+	var nextID string
+	if len(res) > query.Limit {
+		nextID = res[len(res)-1].ID
+		res = res[:query.Limit]
+	}
+	return QueryResult[SearchQueryResultItem, string]{Items: res, NextID: nextID, Total: total}, nil
+}
+
+func (m *modelTx) getCount(query string, params ...any) (int64, error) {
+	rows, err := m.executor().Query(query, params...)
+	if err != nil {
+		return -1, mapError(err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+	var count int64
+	if rows.Next() {
+		_ = rows.Scan(&count)
+	}
+	return count, nil
 }
 
 // ============================== helpers ====================================
@@ -306,15 +618,14 @@ func scanRows[T any](rows *sqlx.Rows) ([]T, error) {
 	return res, nil
 }
 
-func scanRowsQueryResult[T, N any](rows *sqlx.Rows, nextIDFn func(res []T) N, total int64) (QueryResult[T, N], error) {
+func scanRowsQueryResult[T any](rows *sqlx.Rows) ([]T, error) {
 	var res []T
 	for rows.Next() {
 		var t T
 		if err := rows.StructScan(&t); err != nil {
-			return QueryResult[T, N]{}, mapError(err)
+			return nil, mapError(err)
 		}
 		res = append(res, t)
 	}
-	return QueryResult[T, N]{Items: res,
-		NextID: nextIDFn(res), Total: total}, nil
+	return res, nil
 }
