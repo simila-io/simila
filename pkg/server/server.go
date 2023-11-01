@@ -42,12 +42,12 @@ func Run(ctx context.Context, cfg *Config) error {
 	gsvc := api.NewService()
 	var grpcRegF grpc.RegisterF = func(gs *ggrpc.Server) error {
 		grpc_health_v1.RegisterHealthServer(gs, health.NewServer())
-		index.RegisterServiceServer(gs, gsvc)
+		index.RegisterServiceServer(gs, gsvc.IndexServiceServer())
 		return nil
 	}
 
 	// Http API (endpoints)
-	hep := api.NewHttpEP()
+	hep := api.NewHttpEP(gsvc)
 
 	// DB
 	db := persistence.NewDb(cfg.DB.Driver, cfg.DB.SourceName())

@@ -20,8 +20,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/logrange/linker"
 	"net/http"
-	"path"
-	"strings"
 	"time"
 )
 
@@ -112,47 +110,4 @@ func (r *Router) registerPingOnly(g *gin.Engine) error {
 func (r *Router) hGetPing(c *gin.Context) {
 	r.logger.Debugf("ping")
 	c.String(http.StatusOK, "pong")
-}
-
-// ComposeURI helper function which composes URI, adding ID to the request path
-func ComposeURI(r *http.Request, id string) string {
-	var resURL string
-	if r.URL.IsAbs() {
-		resURL = path.Join(r.URL.String(), id)
-	} else {
-		resURL = ResolveScheme(r) + "://" + path.Join(ResolveHost(r), r.URL.String(), id)
-	}
-	return resURL
-}
-
-// ResolveScheme resolves initial request type by r
-func ResolveScheme(r *http.Request) string {
-	switch {
-	case r.Header.Get("X-Forwarded-Proto") == "https":
-		return "https"
-	case r.URL.Scheme == "https":
-		return "https"
-	case r.TLS != nil:
-		return "https"
-	case strings.HasPrefix(r.Proto, "HTTPS"):
-		return "https"
-	default:
-		return "http"
-	}
-}
-
-// ResolveHost returns host part of r
-func ResolveHost(r *http.Request) (host string) {
-	switch {
-	case r.Header.Get("X-Forwarded-For") != "":
-		return r.Header.Get("X-Forwarded-For")
-	case r.Header.Get("X-Host") != "":
-		return r.Header.Get("X-Host")
-	case r.Host != "":
-		return r.Host
-	case r.URL.Host != "":
-		return r.URL.Host
-	default:
-		return ""
-	}
 }

@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package format.v1;
+option go_package = "./format/v1;format";
+
+// Service provides an external API for managing formats
+service Service {
+  // Create allows to create a new format
+  rpc Create(Format) returns (Format);
+  // Get returns format by its name
+  rpc Get(Id) returns (Format);
+  // Delete allows to delete an existing format
+  rpc Delete(Id) returns (Format);
+  // List returns all known formats
+  rpc List(google.protobuf.Empty) returns (Formats);
+}
+
+// Id allows to provide pure id for an entity
+message Id {
+  string id = 1;
+}
+
+// Format describes a document format
+message Format {
+  // name uniquely identifies a format
+  string name = 1;
+  // basis defines a coordinate system for describing index's records for the format
+  repeated Dimenstion basis = 2;
+}
+
+// Dimension is one of the coordinates in a basis
+message Dimenstion {
+  // name is the dimension name
+  string name = 1;
+  // type of the dimension value - int/string
+  string type = 2;
+  // min is the minimum value. For int - the minimum int value, for string - the minimum string length
+  int32 min = 3;
+  // max is the maximum value. For int - the maximum int value, for string - the maximum string length
+  int32 max = 4;
+}
+
+// Formats uses as a result of List() function
+message Formats {
+  repeated Format formats = 1;
+}

@@ -1,30 +1,146 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 package index.v1;
 option go_package = "./index/v1;index";
 
+// Service provides an external API for managing indexes and their records
 service Service {
-  rpc Create(CreateIndexRequest) returns (google.protobuf.Empty);
+  // Create allows to create a new index.
+  rpc Create(CreateIndexRequest) returns (Index);
+  // Delete allows to remove an index by its id
+  rpc Delete(Id) returns (google.protobuf.Empty);
+  // Get returns information about the index
+  rpc Get(Id) returns (Index);
+  // Put allows to update the index tags
+  rpc Put(Index) returns (Index);
+  // List returns list of known indexes
+  rpc List(ListRequest) returns (Indexes);
+  // PatchRecords allows to insert, update or delete an index's records
+  rpc PatchRecords(PatchRecordsRequest) returns (PatchRecordsResult);
+  // ListRecords returns list of records for an index
+  rpc ListRecords(ListRecordsRequest) returns (ListRecordsResult);
+  // SearchRecords runs the search across all indexes by the specified query. Result will
+  // be ordered by indexID:recordID order
+  rpc SearchRecords(SearchRecordsRequest) returns (SearchRecordsResult);
 }
 
+// CreateIndexRequest allows to create a new index
 message CreateIndexRequest {
-  // ID contains the index identifier. It may be generated or provided. If provided, caller must
-  // support it. ID cannot be more than 256 bytes long
-  string ID = 1;
+  // id contains the index identifier. It may be generated or provided. If provided, caller must
+  // support it. id cannot be more than 256 bytes long
+  string id = 1;
   // format name. Format must exist
   string format = 2;
   // tags associated with the index. May be empty.
   repeated string tags = 3;
-
-  bytes documentBody = 4;
+  // document contains the binary data for the format provided. It may be empty
+  optional bytes document = 4;
+  // records contains the list of records that can be added to the index when it is created
+  repeated Record records = 5;
 }
 
+// Index describes an index
 message Index {
+  // id the index uniquely identifier
   string id = 1;
+  // format - the index format
   string format = 2;
+  // tags the list of tags associated with the index
   repeated string tags = 3;
+  // createdAt the timestamp when the index was created
   google.protobuf.Timestamp createdAt = 4;
+}
+
+// Id allows to provide pure id for an entity
+message Id {
+  string id = 1;
+}
+
+// Indexes describes the group of indexes. Used list operation.
+message Indexes {
+  // indexes contains the list of indexes
+  repeated Index indexes = 1;
+  // nextIndexId is used for pagination
+  optional string nextIndexId = 2;
+  // total contains the total number of known indexes
+  int64 total = 3;
+}
+
+// Record represents an index record
+message Record {
+  // id is the record id - this field is populated by parser or it is provided when records are created.
+  string id = 1;
+  // segment contains the searchable text for the record
+  string segment = 2;
+  // vector is the list of the field values (stringified) ordered according the basis fields definition
+  repeated string vector = 3;
+}
+
+// ListRequest describes input parameters for the list indexes operation
+message ListRequest {
+  string startIndexId = 1;
+  optional string format = 2;
+  repeated string tags = 3;
+  optional google.protobuf.Timestamp createdAfter = 4;
+  optional google.protobuf.Timestamp createdBefore = 5;
+  optional int64 limit = 6;
+}
+
+message ListRecordsResult {
+  repeated Record records = 1;
+  optional string nextRecordId = 2;
+}
+
+// ListRecordsRequest describes input parameters for list of records for a specific index operation
+message ListRecordsRequest {
+  // id is the requested index id
+  string id = 1;
+  optional string startRecordId = 2;
+  optional int64 limit = 3;
+}
+
+// PatchRecordsRequest describes input parameters for index records patch operation.
+message PatchRecordsRequest {
+  // id is the patched index id
+  string id = 1;
+  // upsertRecords contains the list of records that should be inserted or updated
+  repeated Record upsertRecords = 2;
+  // deleteRecords contains the list of records that should be deleted
+  repeated Record deleteRecords = 3;
+}
+
+// PatchRecordsResult describes the result of the patch index's records operation
+message PatchRecordsResult {
+  int64 inserted = 1;
+  int64 updated = 2;
+  int64 deleted = 3;
+}
+
+// SearchRecordsRequest describes input parameters for the Search over indexes operation.
+message SearchRecordsRequest {
+  string text = 1;
+  repeated string tags = 2;
+  repeated string indexIDs = 3;
+  // distinct - if it is true and specified the result will contain only one record(first) per index,
+  // even if the index contains multiple places where the text is found. If the parameter is false,
+  // or not specified, the result set will contain all found places for each index.
+  optional bool distinct = 4;
+  optional string pageId = 5;
+  // limit specifies the maximum number of records in the result set
+  optional int64 limit = 6;
+}
+
+// IndexRecord describes a record for a specific index
+message IndexRecord {
+  string indexId = 1;
+  Record indexRecord = 2;
+}
+
+// SearchRecordsResult contains the result of a search operation
+message SearchRecordsResult {
+  repeated IndexRecord records = 1;
+  optional string nextPageId = 2;
 }
