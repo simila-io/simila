@@ -15,8 +15,6 @@
 package persistence
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -24,28 +22,48 @@ import (
 	"time"
 )
 
+const (
+	DTypeNumber Type = "number"
+	DTypeString Type = "string"
+)
+
 type (
-	StrStrMap map[string]string
+	Type string
+
+	Dimension struct {
+		Name string `json:"name"`
+		Type Type   `json:"type"`
+		Min  int64  `json:"min"`
+		Max  int64  `json:"max"`
+	}
+
+	Basis []Dimension
+
+	Component any
+
+	Vector []Component
 
 	Format struct {
 		ID        string    `db:"id"`
 		Name      string    `db:"name"`
-		Basis     StrStrMap `db:"basis"`
+		Basis     Basis     `db:"basis"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
+	Tags map[string]string
+
 	Index struct {
 		ID        string    `db:"id"`
 		Format    string    `db:"format"`
-		Tags      StrStrMap `db:"tags"`
+		Tags      Tags      `db:"tags"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
 	IndexQuery struct {
 		Format        string
-		Tags          StrStrMap
+		Tags          Tags
 		CreatedAfter  time.Time
 		CreatedBefore time.Time
 		FromID        string
@@ -56,16 +74,16 @@ type (
 		ID        string    `db:"id"`
 		IndexID   string    `db:"index_id"`
 		Segment   string    `db:"segment"`
-		Vector    StrStrMap `db:"vector"`
+		Vector    Vector    `db:"vector"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
 	IndexRecordQuery struct {
 		IndexIDs      []string
-		Tags          StrStrMap // index tags
-		Query         string    // underlying search engine query
-		Distinct      bool      // if true, returns at most 1 result per index
+		Tags          Tags   // index tags
+		Query         string // underlying search engine query
+		Distinct      bool   // if true, returns at most 1 result per index
 		CreatedAfter  time.Time
 		CreatedBefore time.Time
 		FromID        string
@@ -79,26 +97,106 @@ type (
 	}
 )
 
-// RecordID converts a tuple of (index ID, record vector) to index record ID
-func RecordID(indexID string, vector StrStrMap) (string, error) {
-	if len(indexID) == 0 || len(vector) == 0 {
-		return "", fmt.Errorf("indexID and record vector must be specified: %w", errors.ErrInvalid)
+func FromNumber(f float64) Component {
+	return f
+}
+
+func FromString(s string) Component {
+	return s
+}
+
+func DType(c Component) Type {
+	switch c.(type) {
+	case string:
+		return DTypeString
+	case float64:
+		return DTypeNumber
 	}
-	var bb bytes.Buffer
-	bb.WriteString(indexID)
-	bb.Write(mustEncode(vector))
-	hSum := sha1.Sum(bb.Bytes())
-	return fmt.Sprintf("%x", hSum), nil
+	return ""
 }
 
-func (m StrStrMap) Value() (value driver.Value, err error) {
-	return json.Marshal(m)
+func NewBasis(dims ...Dimension) (Basis, error) {
+	if len(dims) == 0 {
+		return Basis{}, fmt.Errorf("basis must have non-zero number of dimentions: %w", errors.ErrInvalid)
+	}
+	for i := 0; i < len(dims); i++ {
+		if len(dims[i].Name) == 0 {
+			return Basis{}, fmt.Errorf("dimention=%v name must be non-empty: %w", dims[i], errors.ErrInvalid)
+		}
+		if dims[i].Min == dims[i].Max {
+			return Basis{}, fmt.Errorf("dimention=%v min max values must be different: %w", dims[i], errors.ErrInvalid)
+		}
+		if dims[i].Type != DTypeString && dims[i].Type != DTypeNumber {
+			return Basis{}, fmt.Errorf("dimention=%v type must be either %q or %q: %w",
+				dims[i], DTypeString, DTypeNumber, errors.ErrInvalid)
+		}
+	}
+	return dims, nil
 }
 
-func (m *StrStrMap) Scan(value any) error {
-	b, ok := value.([]byte)
+func NewVector(basis Basis, comps ...Component) (Vector, error) {
+	if len(comps) != len(basis) {
+		return Vector{}, fmt.Errorf("# of vector components=%d must match # of basis dimensions=%d: %w",
+			len(comps), len(basis), errors.ErrInvalid)
+	}
+	for i := 0; i < len(comps); i++ {
+		if basis[i].Type != DType(comps[i]) {
+			return Vector{}, fmt.Errorf("component=%q type does not match the basis dimension=%v type: %w",
+				comps[i], basis[i], errors.ErrInvalid)
+		}
+		switch DType(comps[i]) {
+		case DTypeString:
+			v := comps[i].(string)
+			if int64(len(v)) < basis[i].Min || int64(len(v)) > basis[i].Max {
+				return Vector{}, fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
+					comps[i], basis[i], errors.ErrInvalid)
+			}
+		case DTypeNumber:
+			v := int64(comps[i].(float64))
+			if v < basis[i].Min || v > basis[i].Max {
+				return Vector{}, fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
+					comps[i], basis[i], errors.ErrInvalid)
+			}
+		default:
+			return Vector{}, fmt.Errorf("unknown component=%q type=%s: %w",
+				comps[i], DType(comps[i]), errors.ErrInvalid)
+		}
+	}
+	return comps, nil
+}
+
+func (v Vector) Value() (value driver.Value, err error) {
+	return json.Marshal(v)
+}
+
+func (v *Vector) Scan(value any) error {
+	buf, ok := value.([]byte)
 	if !ok {
-		return fmt.Errorf("unexpected value in scan")
+		return fmt.Errorf("not []byte value in scan")
 	}
-	return json.Unmarshal(b, &m)
+	return json.Unmarshal(buf, v)
+}
+
+func (b Basis) Value() (value driver.Value, err error) {
+	return json.Marshal(b)
+}
+
+func (b *Basis) Scan(value any) error {
+	buf, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("not []byte value in scan")
+	}
+	return json.Unmarshal(buf, b)
+}
+
+func (t Tags) Value() (value driver.Value, err error) {
+	return json.Marshal(t)
+}
+
+func (t *Tags) Scan(value any) error {
+	buf, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("not []byte value in scan")
+	}
+	return json.Unmarshal(buf, &t)
 }

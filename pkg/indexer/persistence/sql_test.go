@@ -31,18 +31,28 @@ func TestRepositoryTestSuite(t *testing.T) {
 
 func (s *pureSqlTestSuite) TestCreateIndexRecord() {
 	mtx := s.db.NewModelTx()
-	frmt := Format{Name: "pdf", Basis: StrStrMap{"d1": "1", "d2": "2"}}
+	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
+	assert.Nil(s.T(), err)
+
+	frmt := Format{Name: "pdf", Basis: bas}
 	frmtID, err := mtx.CreateFormat(frmt)
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", frmtID)
 
-	idx := Index{ID: "abc.txt", Format: frmt.Name, Tags: StrStrMap{"k": "v"}}
+	idx := Index{ID: "abc.txt", Format: frmt.Name, Tags: Tags{"key": "val"}}
 	idxID, err := mtx.CreateIndex(idx)
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", idxID)
 
-	rec := IndexRecord{IndexID: idxID, Segment: "haha", Vector: StrStrMap{"x1": "1", "x2": "2"}}
+	vec, err := NewVector(frmt.Basis, FromNumber(7), FromString("word"))
+	assert.Nil(s.T(), err)
+
+	rec := IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec}
 	recID, err := mtx.CreateIndexRecord(rec)
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", recID)
+
+	rec1, err := mtx.GetIndexRecord(recID)
+	assert.Nil(s.T(), err)
+	assert.NotEqual(s.T(), "", rec1.ID)
 }

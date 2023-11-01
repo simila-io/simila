@@ -35,8 +35,8 @@ create index if not exists "idx_format_basis" on "format" using gin ("basis");
 
 create table if not exists "index"
 (
-    "id"         varchar(64)              not null,
-    "format"     varchar(255)             not null references "format" ("name") on delete restrict,
+    "id"         varchar(255)             not null,
+    "format"  	 varchar(255)             not null references "format" ("name") on delete restrict,
     "tags"       jsonb                    not null default '{}'::jsonb,
     "created_at" timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at" timestamp with time zone not null default (now() at time zone 'utc'),
@@ -48,10 +48,10 @@ create index if not exists "idx_index_created_at" on "index" ("created_at");
 
 create table if not exists "index_record"
 (
-    "id"          varchar(64)  not null,
-    "index_id"    varchar(64)  not null references "index" ("id") on delete cascade,
-    "segment"     text         not null,
-    "vector"   	  jsonb        not null default '{}'::jsonb,
+    "id"          varchar(64)   not null,
+    "index_id"    varchar(255)  not null references "index" ("id") on delete cascade,
+    "segment"     text         	not null,
+    "vector"   	  jsonb        	not null default '{}'::jsonb,
     "created_at"  timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at"  timestamp with time zone not null default (now() at time zone 'utc'),
     primary key ("id")

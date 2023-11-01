@@ -15,10 +15,8 @@
 package persistence
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/gob"
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
@@ -168,7 +166,10 @@ func (t *tx) ExecScript(sqlScript string) error {
 // ============================== modelTx ====================================
 
 func (m *modelTx) CreateFormat(format Format) (string, error) {
-	format.ID = newID()
+	if len(format.Basis) == 0 {
+		format.Basis = make([]Dimension, 0)
+	}
+	format.ID = ulidutils.NewID()
 	format.CreatedAt = time.Now()
 	format.UpdatedAt = format.CreatedAt
 	_, err := m.executor().Exec("insert into format (id, name, basis, created_at, updated_at) values ($1, $2, $3, $4, $5)",
@@ -199,7 +200,7 @@ func (m *modelTx) CreateIndex(index Index) (string, error) {
 		return "", fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
 	}
 	if index.Tags == nil {
-		index.Tags = make(StrStrMap)
+		index.Tags = make(Tags)
 	}
 	index.CreatedAt = time.Now()
 	index.UpdatedAt = index.CreatedAt
@@ -232,14 +233,15 @@ func (m *modelTx) ListIndexes(query IndexQuery) (*QueryResult[*Index, string], e
 }
 
 func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
-	id, err := RecordID(record.IndexID, record.Vector)
-	if err != nil {
-		return "", err
+	if len(record.ID) == 0 {
+		return "", fmt.Errorf("index record ID must be specified: %w", errors.ErrInvalid)
 	}
-	record.ID = id
+	if len(record.Vector) == 0 {
+		record.Vector = make([]Component, 0)
+	}
 	record.CreatedAt = time.Now()
 	record.UpdatedAt = record.CreatedAt
-	_, err = m.executor().Exec("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ($1, $2, $3, $4, $5, $6)",
+	_, err := m.executor().Exec("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ($1, $2, $3, $4, $5, $6)",
 		record.ID, record.IndexID, record.Segment, record.Vector, record.CreatedAt, record.UpdatedAt)
 	if err != nil {
 		return "", mapError(err)
@@ -248,7 +250,11 @@ func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
 }
 
 func (m *modelTx) GetIndexRecord(ID string) (*IndexRecord, error) {
-	panic("TODO")
+	var r IndexRecord
+	if err := m.executor().Get(&r, "select * FROM index_record WHERE id=$1", ID); err != nil {
+		return nil, mapError(err)
+	}
+	return &r, nil
 }
 
 func (m *modelTx) UpdateIndexRecord(record IndexRecord) (*IndexRecord, error) {
@@ -311,17 +317,4 @@ func scanRowsQueryResult[T, N any](rows *sqlx.Rows, nextIDFn func(res []T) N, to
 	}
 	return QueryResult[T, N]{Items: res,
 		NextID: nextIDFn(res), Total: total}, nil
-}
-
-func mustEncode(v any) []byte {
-	var bb bytes.Buffer
-	enc := gob.NewEncoder(&bb)
-	if err := enc.Encode(v); err != nil {
-		panic(err)
-	}
-	return bb.Bytes()
-}
-
-func newID() string {
-	return fmt.Sprintf("%x", ulidutils.New().Bytes())
 }
