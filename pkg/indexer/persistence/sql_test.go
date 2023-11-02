@@ -41,6 +41,9 @@ func (s *pureSqlTestSuite) TestFormat() {
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", frmtID)
 
+	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	assert.ErrorIs(s.T(), err, errors.ErrExist)
+
 	frmt, err := mtx.GetFormat("pdf")
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), "pdf", frmt.Name)
@@ -105,6 +108,8 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	assert.Nil(s.T(), err)
 	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	assert.ErrorIs(s.T(), err, errors.ErrExist)
 
 	recID, err := mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
 	assert.Nil(s.T(), err)
@@ -150,6 +155,8 @@ func (s *pureSqlTestSuite) TestSearch() {
 
 	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
 	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: "abc.txt", Segment: "haha", Vector: vec})
+	assert.ErrorIs(s.T(), err, errors.ErrExist)
 	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec})
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
@@ -167,22 +174,11 @@ func (s *pureSqlTestSuite) TestConstraints() {
 
 	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
 	assert.Nil(s.T(), err)
-	vec, err := NewVector(bas, FromNumber(7), FromString("word"))
-	assert.Nil(s.T(), err)
 
 	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)
-	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: "abc.txt", Segment: "haha", Vector: vec})
-	assert.Nil(s.T(), err)
-
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
-	assert.ErrorIs(s.T(), err, errors.ErrExist)
-	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
-	assert.ErrorIs(s.T(), err, errors.ErrExist)
-	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: "abc.txt", Segment: "haha", Vector: vec})
-	assert.ErrorIs(s.T(), err, errors.ErrExist)
 
 	err = mtx.DeleteFormat("pdf")
 	assert.ErrorIs(s.T(), err, errors.ErrConflict)
