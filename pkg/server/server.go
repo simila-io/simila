@@ -22,6 +22,8 @@ import (
 	"github.com/simila-io/simila/pkg/grpc"
 	"github.com/simila-io/simila/pkg/http"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
+	"github.com/simila-io/simila/pkg/parser"
+	"github.com/simila-io/simila/pkg/parser/txt"
 	"github.com/simila-io/simila/pkg/version"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -60,6 +62,8 @@ func Run(ctx context.Context, cfg *Config) error {
 	inj.Register(linker.Component{Name: "", Value: gsvc})
 	inj.Register(linker.Component{Name: "", Value: grpc.NewServer(grpc.Config{Transport: *cfg.GrpcTransport, RegisterEndpoints: grpcRegF})})
 	inj.Register(linker.Component{Name: "", Value: http.NewRouter(http.Config{HttpPort: cfg.HttpPort, RestRegistrar: hep.RegisterEPs})})
+	inj.Register(linker.Component{Name: "", Value: parser.NewParserProvider()})
+	inj.Register(linker.Component{Name: "", Value: txt.New()})
 
 	inj.Init(ctx)
 	<-ctx.Done()
