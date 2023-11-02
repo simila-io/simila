@@ -425,11 +425,15 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 	args := make([]any, 0)
 
 	if len(query.FromID) > 0 {
+		var fromID IndexRecordID
+		if err := fromID.Decode(query.FromID); err != nil {
+			return QueryResult[IndexRecord, string]{}, fmt.Errorf("invalid FromID: %w", errors.ErrInvalid)
+		}
 		if len(args) > 0 {
 			sb.WriteString(" and ")
 		}
-		sb.WriteString(" id >= ? ")
-		args = append(args, query.FromID)
+		sb.WriteString(" index_record.index_id >= ? and index_record.id >= ? ")
+		args = append(args, fromID.IndexID, fromID.RecordID)
 	}
 	if len(query.IndexIDs) > 0 {
 		if len(args) > 0 {
@@ -470,7 +474,7 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 		return QueryResult[IndexRecord, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index_record where %s order by id limit $%d", where, len(args)), args...)
+	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index_record where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{Total: total}, mapError(err)
 	}
@@ -478,12 +482,12 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 	if err != nil {
 		return QueryResult[IndexRecord, string]{}, mapError(err)
 	}
-	var nextID string
+	var nextID IndexRecordID
 	if len(res) > query.Limit {
-		nextID = res[len(res)-1].ID
+		nextID = IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
 		res = res[:query.Limit]
 	}
-	return QueryResult[IndexRecord, string]{Items: res, NextID: nextID, Total: total}, nil
+	return QueryResult[IndexRecord, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
 }
 
 func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error) {
@@ -498,11 +502,15 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	args := make([]any, 0)
 
 	if len(query.FromID) > 0 {
+		var fromID IndexRecordID
+		if err := fromID.Decode(query.FromID); err != nil {
+			return QueryResult[SearchQueryResultItem, string]{}, fmt.Errorf("invalid FromID: %w", errors.ErrInvalid)
+		}
 		if len(args) > 0 {
 			sb.WriteString(" and ")
 		}
-		sb.WriteString(" index_record.id >= ? ")
-		args = append(args, query.FromID)
+		sb.WriteString(" index_record.index_id >= ? and index_record.id >= ? ")
+		args = append(args, fromID.IndexID, fromID.RecordID)
 	}
 	if len(query.IndexIDs) > 0 {
 		if len(args) > 0 {
@@ -553,7 +561,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	}
 	args = append(args, query.Limit+1)
 	rows, err := m.executor().Queryx(fmt.Sprintf("select index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id where %s order by id asc limit $%d", where, len(args)), args...)
+		"inner join index on index.id = index_record.index_id where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
@@ -561,12 +569,12 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
-	var nextID string
+	var nextID IndexRecordID
 	if len(res) > query.Limit {
-		nextID = res[len(res)-1].ID
+		nextID = IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
 		res = res[:query.Limit]
 	}
-	return QueryResult[SearchQueryResultItem, string]{Items: res, NextID: nextID, Total: total}, nil
+	return QueryResult[SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
 }
 
 func (m *modelTx) getCount(query string, params ...any) (int64, error) {

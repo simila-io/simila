@@ -84,7 +84,7 @@ func (s *pureSqlTestSuite) TestIndex() {
 	err = mtx.UpdateIndex(idx)
 	assert.Nil(s.T(), err)
 
-	res, err := mtx.QueryIndexes(IndexQuery{FromID: "0", Format: "pdf", Tags: idx.Tags, Limit: 10})
+	res, err := mtx.QueryIndexes(IndexQuery{Format: "pdf", Tags: idx.Tags, Limit: 10})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(1), res.Total)
 	assert.Equal(s.T(), 1, len(res.Items))
@@ -128,11 +128,11 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	err = mtx.UpdateIndexRecord(rec)
 	assert.Nil(s.T(), err)
 
-	res, err := mtx.QueryIndexRecords(IndexRecordQuery{FromID: "0", IndexIDs: []string{idxID}, CreatedBefore: time.Now(), Limit: 2})
+	res, err := mtx.QueryIndexRecords(IndexRecordQuery{IndexIDs: []string{idxID}, CreatedBefore: time.Now(), Limit: 2})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(3), res.Total)
 	assert.Equal(s.T(), 2, len(res.Items))
-	assert.Equal(s.T(), "789", res.NextID)
+	assert.Equal(s.T(), IndexRecordID{IndexID: idxID, RecordID: "789"}.Encode(), res.NextID)
 
 	err = mtx.DeleteIndexRecord(rec.ID)
 	assert.Nil(s.T(), err)
@@ -162,11 +162,11 @@ func (s *pureSqlTestSuite) TestSearch() {
 	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
 	assert.Nil(s.T(), err)
 
-	res, err := mtx.Search(SearchQuery{FromID: "0", IndexIDs: []string{idxID}, Query: "hello OR француз", Limit: 1})
+	res, err := mtx.Search(SearchQuery{IndexIDs: []string{idxID}, Query: "(HELLO OR француз) (-haha)", Limit: 1})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(2), res.Total)
 	assert.Equal(s.T(), 1, len(res.Items))
-	assert.Equal(s.T(), "789", res.NextID)
+	assert.Equal(s.T(), IndexRecordID{IndexID: idxID, RecordID: "789"}.Encode(), res.NextID)
 }
 
 func (s *pureSqlTestSuite) TestConstraints() {

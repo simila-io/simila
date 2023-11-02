@@ -16,6 +16,7 @@ package persistence
 
 import (
 	"database/sql/driver"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
@@ -106,6 +107,11 @@ type (
 		NextID N
 		Total  int64
 	}
+
+	IndexRecordID struct {
+		IndexID  string `json:"index_id"`
+		RecordID string `json:"record_id"`
+	}
 )
 
 func FromNumber(f float64) Component {
@@ -179,6 +185,31 @@ func CheckVector(basis Basis, vector Vector) error {
 			return fmt.Errorf("unknown component=%q type=%s: %w",
 				vector[i], DType(vector[i]), errors.ErrInvalid)
 		}
+	}
+	return nil
+}
+
+func (id IndexRecordID) Encode() string {
+	if len(id.RecordID) == 0 && len(id.IndexID) == 0 {
+		return ""
+	}
+	bb, err := json.Marshal(id)
+	if err != nil {
+		panic(fmt.Sprintf("failed to json marshal IndexRecordID: %v", err))
+	}
+	return base64.StdEncoding.EncodeToString(bb)
+}
+
+func (id *IndexRecordID) Decode(s string) error {
+	if len(s) == 0 {
+		return nil
+	}
+	bb, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return fmt.Errorf("failed to base64 decode IndexRecordID: %v", err)
+	}
+	if err = json.Unmarshal(bb, id); err != nil {
+		return fmt.Errorf("failed to json unmashal IndexRecordID: %v", err)
 	}
 	return nil
 }
