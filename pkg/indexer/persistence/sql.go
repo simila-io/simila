@@ -167,7 +167,7 @@ func (t *tx) ExecScript(sqlScript string) error {
 
 func (m *modelTx) CreateFormat(format Format) (string, error) {
 	if len(format.Basis) == 0 {
-		format.Basis = make([]Dimension, 0)
+		format.Basis = []byte("{}")
 	}
 	format.ID = ulidutils.NewID()
 	format.CreatedAt = time.Now()
@@ -320,11 +320,14 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 		args = append(args, query.CreatedAfter)
 	}
 
+	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
 	total, err := m.getCount(fmt.Sprintf("select count(*) from index where %s", where), args...)
 	if err != nil {
 		return QueryResult[Index, string]{}, mapError(err)
 	}
+
+	// query
 	if query.Limit <= 0 {
 		return QueryResult[Index, string]{Total: total}, nil
 	}
@@ -333,6 +336,8 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 	if err != nil {
 		return QueryResult[Index, string]{Total: total}, mapError(err)
 	}
+
+	// results
 	res, err := scanRowsQueryResult[Index](rows)
 	if err != nil {
 		return QueryResult[Index, string]{}, mapError(err)
@@ -350,7 +355,7 @@ func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
 		return "", fmt.Errorf("index record ID must be specified: %w", errors.ErrInvalid)
 	}
 	if len(record.Vector) == 0 {
-		record.Vector = make([]Component, 0)
+		record.Vector = []byte("{}")
 	}
 	record.CreatedAt = time.Now()
 	record.UpdatedAt = record.CreatedAt
@@ -465,11 +470,14 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 		args = append(args, query.CreatedAfter)
 	}
 
+	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
 	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record where %s ", where), args...)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{}, mapError(err)
 	}
+
+	// query
 	if query.Limit <= 0 {
 		return QueryResult[IndexRecord, string]{Total: total}, nil
 	}
@@ -478,6 +486,8 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 	if err != nil {
 		return QueryResult[IndexRecord, string]{Total: total}, mapError(err)
 	}
+
+	// results
 	res, err := scanRowsQueryResult[IndexRecord](rows)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{}, mapError(err)
@@ -494,10 +504,6 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	if len(query.Query) == 0 {
 		return QueryResult[SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
-
-	// TODO: how to implement query.Distinct?
-	// TODO: how to paginate if `order by score`?
-
 	sb := strings.Builder{}
 	args := make([]any, 0)
 
@@ -550,21 +556,31 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		sb.WriteString(" index_record.segment &@~ ? ")
 		args = append(args, query.Query)
 	}
+	cntDistinct, qryDistinct := "*", ""
+	if query.Distinct {
+		cntDistinct = "distinct index_record.index_id"
+		qryDistinct = "distinct on(index_record.index_id)"
+	}
 
+	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record inner join index on index.id = index_record.index_id where %s ", where), args...)
+	total, err := m.getCount(fmt.Sprintf("select count(%s) from index_record inner join index on index.id = index_record.index_id where %s ", cntDistinct, where), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
+
+	// query
 	if query.Limit <= 0 {
 		return QueryResult[SearchQueryResultItem, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().Queryx(fmt.Sprintf("select index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
+	rows, err := m.executor().Queryx(fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+		"inner join index on index.id = index_record.index_id where %s order by index_id asc, id asc limit $%d", qryDistinct, where, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
+
+	// results
 	res, err := scanRowsQueryResult[SearchQueryResultItem](rows)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
