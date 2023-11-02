@@ -159,7 +159,9 @@ func (hep *HttpEP) hGetIndexes(c *gin.Context) {
 		req.Format = cast.Ptr(format)
 	}
 	if tags := c.DefaultQuery("tags", ""); tags != "" {
-		req.Tags = strings.Split(tags, ",")
+		if hep.errorRespnse(c, json.Unmarshal(cast.StringToByteArray(tags), &req.Tags), fmt.Sprintf("the tags parameter should be a json map values like tags={\"key1\": \"val1\"..}")) {
+			return
+		}
 	}
 	if ca := c.DefaultQuery("created-after", ""); ca != "" {
 		st, err := ParseTime(ca)

@@ -35,7 +35,7 @@ message CreateIndexRequest {
   // format name. Format must exist
   string format = 2;
   // tags associated with the index. May be empty.
-  repeated string tags = 3;
+  map<string, string> tags = 3;
   // document contains the binary data for the format provided. It may be empty
   optional bytes document = 4;
   // records contains the list of records that can be added to the index when it is created
@@ -48,8 +48,8 @@ message Index {
   string id = 1;
   // format - the index format
   string format = 2;
-  // tags the list of tags associated with the index
-  repeated string tags = 3;
+  // tags the list of key:value pairs associated with the index
+  map<string, string> tags = 3;
   // createdAt the timestamp when the index was created
   google.protobuf.Timestamp createdAt = 4;
 }
@@ -75,15 +75,15 @@ message Record {
   string id = 1;
   // segment contains the searchable text for the record
   string segment = 2;
-  // vector is the list of the field values (stringified) ordered according the basis fields definition
-  repeated string vector = 3;
+  // vector is the list of the byte values (stringified) ordered according the basis fields definition
+  bytes vector = 3;
 }
 
 // ListRequest describes input parameters for the list indexes operation
 message ListRequest {
   string startIndexId = 1;
   optional string format = 2;
-  repeated string tags = 3;
+  map<string, string> tags = 3;
   optional google.protobuf.Timestamp createdAfter = 4;
   optional google.protobuf.Timestamp createdBefore = 5;
   optional int64 limit = 6;
@@ -122,7 +122,7 @@ message PatchRecordsResult {
 // SearchRecordsRequest describes input parameters for the Search over indexes operation.
 message SearchRecordsRequest {
   string text = 1;
-  repeated string tags = 2;
+  map<string, string> tags = 2;
   repeated string indexIDs = 3;
   // distinct - if it is true and specified the result will contain only one record(first) per index,
   // even if the index contains multiple places where the text is found. If the parameter is false,
