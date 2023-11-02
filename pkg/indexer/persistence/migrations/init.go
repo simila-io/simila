@@ -54,7 +54,7 @@ create table if not exists "index_record"
     "vector"   	  jsonb        	not null default '{}'::jsonb,
     "created_at"  timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at"  timestamp with time zone not null default (now() at time zone 'utc'),
-    primary key ("id", "index_id")
+    primary key ("index_id", "id")
 );
 
 create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment");

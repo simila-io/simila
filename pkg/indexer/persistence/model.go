@@ -19,30 +19,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/acquirecloud/golibs/errors"
 	"time"
 )
 
-const (
-	DTypeNumber Type = "number"
-	DTypeString Type = "string"
-)
-
 type (
-	Type string
+	Basis json.RawMessage
 
-	Dimension struct {
-		Name string `json:"name"`
-		Type Type   `json:"type"`
-		Min  int64  `json:"min"`
-		Max  int64  `json:"max"`
-	}
-
-	Basis []Dimension
-
-	Component any
-
-	Vector []Component
+	Vector json.RawMessage
 
 	Format struct {
 		ID        string    `db:"id"`
@@ -92,7 +75,7 @@ type (
 		IndexIDs []string
 		Query    string // underlying search engine query
 		Tags     Tags   // index tags
-		Distinct *bool  // if true, returns at most 1 result per index
+		Distinct bool   // if true, returns at most 1 result per index
 		FromID   string
 		Limit    int
 	}
@@ -113,81 +96,6 @@ type (
 		RecordID string `json:"record_id"`
 	}
 )
-
-func FromNumber(f float64) Component {
-	return f
-}
-
-func FromString(s string) Component {
-	return s
-}
-
-func DType(c Component) Type {
-	switch c.(type) {
-	case string:
-		return DTypeString
-	case float64:
-		return DTypeNumber
-	}
-	return ""
-}
-
-func NewBasis(dims ...Dimension) (Basis, error) {
-	if len(dims) == 0 {
-		return Basis{}, fmt.Errorf("basis must have non-zero number of dimentions: %w", errors.ErrInvalid)
-	}
-	for i := 0; i < len(dims); i++ {
-		if len(dims[i].Name) == 0 {
-			return Basis{}, fmt.Errorf("dimention=%v name must be non-empty: %w", dims[i], errors.ErrInvalid)
-		}
-		if dims[i].Min == dims[i].Max {
-			return Basis{}, fmt.Errorf("dimention=%v min max values must be different: %w", dims[i], errors.ErrInvalid)
-		}
-		if dims[i].Type != DTypeString && dims[i].Type != DTypeNumber {
-			return Basis{}, fmt.Errorf("dimention=%v type must be either %q or %q: %w",
-				dims[i], DTypeString, DTypeNumber, errors.ErrInvalid)
-		}
-	}
-	return dims, nil
-}
-
-func NewVector(basis Basis, comps ...Component) (Vector, error) {
-	if err := CheckVector(basis, comps); err != nil {
-		return Vector{}, err
-	}
-	return comps, nil
-}
-
-func CheckVector(basis Basis, vector Vector) error {
-	if len(vector) != len(basis) {
-		return fmt.Errorf("# of vector components=%d must match # of basis dimensions=%d: %w",
-			len(vector), len(basis), errors.ErrInvalid)
-	}
-	for i := 0; i < len(vector); i++ {
-		if basis[i].Type != DType(vector[i]) {
-			return fmt.Errorf("component=%q type does not match the basis dimension=%v type: %w",
-				vector[i], basis[i], errors.ErrInvalid)
-		}
-		switch DType(vector[i]) {
-		case DTypeString:
-			v := vector[i].(string)
-			if int64(len(v)) < basis[i].Min || int64(len(v)) > basis[i].Max {
-				return fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
-					vector[i], basis[i], errors.ErrInvalid)
-			}
-		case DTypeNumber:
-			v := int64(vector[i].(float64))
-			if v < basis[i].Min || v > basis[i].Max {
-				return fmt.Errorf("component=%q value does not meet the basis dimension=%v constraints: %w",
-					vector[i], basis[i], errors.ErrInvalid)
-			}
-		default:
-			return fmt.Errorf("unknown component=%q type=%s: %w",
-				vector[i], DType(vector[i]), errors.ErrInvalid)
-		}
-	}
-	return nil
-}
 
 func (id IndexRecordID) Encode() string {
 	if len(id.RecordID) == 0 && len(id.IndexID) == 0 {
@@ -214,30 +122,6 @@ func (id *IndexRecordID) Decode(s string) error {
 	return nil
 }
 
-func (v Vector) Value() (value driver.Value, err error) {
-	return json.Marshal(v)
-}
-
-func (v *Vector) Scan(value any) error {
-	buf, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("not []byte value in scan")
-	}
-	return json.Unmarshal(buf, v)
-}
-
-func (b Basis) Value() (value driver.Value, err error) {
-	return json.Marshal(b)
-}
-
-func (b *Basis) Scan(value any) error {
-	buf, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("not []byte value in scan")
-	}
-	return json.Unmarshal(buf, b)
-}
-
 func (t Tags) Value() (value driver.Value, err error) {
 	return json.Marshal(t)
 }
@@ -245,7 +129,7 @@ func (t Tags) Value() (value driver.Value, err error) {
 func (t *Tags) Scan(value any) error {
 	buf, ok := value.([]byte)
 	if !ok {
-		return fmt.Errorf("not []byte value in scan")
+		return fmt.Errorf("not a []byte value in scan")
 	}
 	return json.Unmarshal(buf, &t)
 }
