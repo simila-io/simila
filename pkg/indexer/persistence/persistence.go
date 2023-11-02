@@ -57,8 +57,8 @@ type (
 		// QueryIndexes lists query matching index entries
 		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
 
-		// CreateIndexRecord creates index record entry
-		CreateIndexRecord(record IndexRecord) (string, error)
+		// CreateIndexRecords creates index records entry
+		CreateIndexRecords(records []IndexRecord) error
 		// GetIndexRecord retrieves index record entry by ID
 		GetIndexRecord(ID string) (IndexRecord, error)
 		// UpdateIndexRecord updates index record

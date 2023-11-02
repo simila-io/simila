@@ -350,21 +350,39 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 	return QueryResult[Index, string]{Items: res, NextID: nextID, Total: total}, nil
 }
 
-func (m *modelTx) CreateIndexRecord(record IndexRecord) (string, error) {
-	if len(record.ID) == 0 {
-		return "", fmt.Errorf("index record ID must be specified: %w", errors.ErrInvalid)
+func (m *modelTx) CreateIndexRecords(records []IndexRecord) error {
+	var sb strings.Builder
+	params := []any{}
+	firstIdx := 1
+	sb.WriteString("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ")
+	now := time.Now()
+	for i, r := range records {
+		if r.ID == "" {
+			return fmt.Errorf("index record for record %d ID must be specified: %w", i, errors.ErrInvalid)
+		}
+		if len(r.Vector) == 0 {
+			r.Vector = []byte("{}")
+		}
+		if i > 0 {
+			sb.WriteString(",")
+		}
+
+		sb.WriteString(fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", firstIdx, firstIdx+1, firstIdx+2, firstIdx+3, firstIdx+4, firstIdx+5))
+		firstIdx += 6
+
+		params = append(params, r.ID)
+		params = append(params, r.IndexID)
+		params = append(params, r.Segment)
+		params = append(params, r.Vector)
+		params = append(params, now)
+		params = append(params, now)
 	}
-	if len(record.Vector) == 0 {
-		record.Vector = []byte("{}")
-	}
-	record.CreatedAt = time.Now()
-	record.UpdatedAt = record.CreatedAt
-	_, err := m.executor().Exec("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ($1, $2, $3, $4, $5, $6)",
-		record.ID, record.IndexID, record.Segment, record.Vector, record.CreatedAt, record.UpdatedAt)
+	_, err := m.executor().Exec(sb.String(), params...)
+
 	if err != nil {
-		return "", mapError(err)
+		return mapError(err)
 	}
-	return record.ID, nil
+	return nil
 }
 
 func (m *modelTx) GetIndexRecord(ID string) (IndexRecord, error) {
