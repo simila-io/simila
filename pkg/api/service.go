@@ -16,10 +16,13 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v1"
+	"github.com/simila-io/simila/pkg/indexer/persistence"
+	"github.com/simila-io/simila/pkg/parser"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 )
@@ -27,6 +30,9 @@ import (
 // Service implements the gRPC API endpoints
 type (
 	Service struct {
+		PProvider parser.Provider `inject:""`
+		Db        persistence.Db  `inject:""`
+
 		idxService idxService
 		fmtService fmtService
 		logger     logging.Logger
@@ -66,6 +72,24 @@ func (s *Service) FormatServiceServer() format.ServiceServer {
 // the body may be taken from the request.
 func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexRequest, body io.Reader) (*index.Index, error) {
 	s.logger.Infof("createIndex(): request=%s, body?=%t", request, body != nil)
+	var p parser.Parser
+	if body != nil {
+		p = s.PProvider.Parser(request.Format)
+		if p == nil {
+			return &index.Index{}, fmt.Errorf("the format %s is not supported: %w", request.Format, errors.ErrInvalid)
+		}
+	}
+
+	mtx := s.Db.NewModelTx()
+	defer mtx.Commit()
+
+	//TODO: no tags yet
+	_, err := mtx.CreateIndex(persistence.Index{ID: request.Id, Format: request.Format})
+	if err != nil {
+		mtx.Rollback()
+		return nil, fmt.Errorf("could not create new index with ID=%s: %w", request.Id, err)
+	}
+
 	return &index.Index{}, nil
 }
 
