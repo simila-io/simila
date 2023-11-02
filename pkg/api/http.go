@@ -21,6 +21,7 @@ import (
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/gin-gonic/gin"
+	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"net/http"
@@ -228,16 +229,42 @@ func (hep *HttpEP) hGetIndexesIdRecords(c *gin.Context) {
 }
 
 func (hep *HttpEP) hPostFormats(c *gin.Context) {
-
+	var f format.Format
+	if hep.errorRespnse(c, BindAppJson(c, &f), "") {
+		return
+	}
+	f1, err := hep.svc.FormatServiceServer().Create(c, &f)
+	if hep.errorRespnse(c, err, "") {
+		return
+	}
+	c.Header("Location", ComposeURI(c.Request, f1.Name))
+	c.JSON(http.StatusCreated, f1)
 }
+
 func (hep *HttpEP) hGetFormats(c *gin.Context) {
-
+	fmts, err := hep.svc.FormatServiceServer().List(c, nil)
+	if hep.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, fmts)
 }
+
 func (hep *HttpEP) hDeleteFormatsId(c *gin.Context) {
-
+	fid := c.Param("id")
+	_, err := hep.svc.FormatServiceServer().Delete(c, &format.Id{Id: fid})
+	if hep.errorRespnse(c, err, "") {
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
-func (hep *HttpEP) hGetFormatsId(c *gin.Context) {
 
+func (hep *HttpEP) hGetFormatsId(c *gin.Context) {
+	fid := c.Param("id")
+	f, err := hep.svc.FormatServiceServer().Get(c, &format.Id{Id: fid})
+	if hep.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, f)
 }
 
 func (hep *HttpEP) errorRespnse(c *gin.Context, err error, msg string) bool {
