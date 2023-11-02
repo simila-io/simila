@@ -491,6 +491,9 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		return QueryResult[SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
 
+	// TODO: how to implement query.Distinct?
+	// TODO: how to paginate if `order by score`?
+
 	sb := strings.Builder{}
 	args := make([]any, 0)
 
@@ -550,7 +553,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	}
 	args = append(args, query.Limit+1)
 	rows, err := m.executor().Queryx(fmt.Sprintf("select index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id where %s order by score desc, id asc limit $%d", where, len(args)), args...)
+		"inner join index on index.id = index_record.index_id where %s order by id asc limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
@@ -598,7 +601,7 @@ func mapError(err error) error {
 	if pqErr, ok := err.(*pq.Error); ok {
 		switch pqErr.Code {
 		case PqForeignKeyViolationError:
-			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrNotExist)
+			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrConflict)
 		case PqUniqueViolationError:
 			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrExist)
 		}

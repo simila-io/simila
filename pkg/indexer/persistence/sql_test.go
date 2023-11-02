@@ -15,6 +15,7 @@
 package persistence
 
 import (
+	"github.com/acquirecloud/golibs/errors"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -30,73 +31,138 @@ func TestRepositoryTestSuite(t *testing.T) {
 	suite.Run(t, new(pureSqlTestSuite))
 }
 
-func (s *pureSqlTestSuite) TestCreateIndexRecord() {
-	// format
+func (s *pureSqlTestSuite) TestFormat() {
 	mtx := s.db.NewModelTx()
+
 	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
 	assert.Nil(s.T(), err)
-	frmt := Format{Name: "pdf", Basis: bas}
-	frmtID, err := mtx.CreateFormat(frmt)
+
+	frmtID, err := mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
 	assert.NotEqual(s.T(), "", frmtID)
+
+	frmt, err := mtx.GetFormat("pdf")
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), "pdf", frmt.Name)
+
 	fmts, err := mtx.ListFormats()
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), 1, len(fmts))
-	idx := Index{ID: "abc.txt", Format: frmt.Name, Tags: Tags{"key": "val"}}
 
-	// index
-	idxID, err := mtx.CreateIndex(idx)
+	err = mtx.DeleteFormat(frmt.Name)
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", idxID)
-	idx, err = mtx.GetIndex(idxID)
+	err = mtx.DeleteFormat(frmt.Name)
+	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
+}
+
+func (s *pureSqlTestSuite) TestIndex() {
+	mtx := s.db.NewModelTx()
+
+	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
 	assert.Nil(s.T(), err)
+	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	assert.Nil(s.T(), err)
+
+	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), "abc.txt", idxID)
+
+	idx, err := mtx.GetIndex(idxID)
+	assert.Nil(s.T(), err)
+
 	idx.Tags["key1"] = "val1"
 	err = mtx.UpdateIndex(idx)
 	assert.Nil(s.T(), err)
-	res1, err := mtx.QueryIndexes(IndexQuery{Format: "pdf", Tags: idx.Tags, Limit: 10})
-	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), int64(1), res1.Total)
-	assert.Equal(s.T(), 1, len(res1.Items))
-	assert.Equal(s.T(), "", res1.NextID)
 
-	// index record
-	vec, err := NewVector(frmt.Basis, FromNumber(7), FromString("word"))
+	res, err := mtx.QueryIndexes(IndexQuery{Format: "pdf", Tags: idx.Tags, Limit: 10})
 	assert.Nil(s.T(), err)
-	rec := IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec}
-	recID, err := mtx.CreateIndexRecord(rec)
+	assert.Equal(s.T(), int64(1), res.Total)
+	assert.Equal(s.T(), 1, len(res.Items))
+	assert.Equal(s.T(), "", res.NextID)
+
+	err = mtx.DeleteIndex(idx.ID)
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", recID)
-	rec = IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec}
-	recID, err = mtx.CreateIndexRecord(rec)
+	err = mtx.DeleteIndex(idx.ID)
+	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
+}
+
+func (s *pureSqlTestSuite) TestIndexRecord() {
+	mtx := s.db.NewModelTx()
+
+	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", recID)
-	rec = IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec}
-	recID, err = mtx.CreateIndexRecord(rec)
+	vec, err := NewVector(bas, FromNumber(7), FromString("word"))
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", recID)
-	rec, err = mtx.GetIndexRecord(recID)
+
+	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
+	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	assert.Nil(s.T(), err)
+
+	recID, err := mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), "123", recID)
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec})
+	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
+	assert.Nil(s.T(), err)
+
+	rec, err := mtx.GetIndexRecord("789")
+	assert.Nil(s.T(), err)
+
 	rec.Segment = "no no я француз haha too"
 	err = mtx.UpdateIndexRecord(rec)
 	assert.Nil(s.T(), err)
-	res2, err := mtx.QueryIndexRecords(IndexRecordQuery{IndexIDs: []string{idx.ID}, CreatedBefore: time.Now(), Limit: 2})
-	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), int64(3), res2.Total)
-	assert.Equal(s.T(), 2, len(res2.Items))
-	assert.Equal(s.T(), "789", res2.NextID)
 
-	// search
-	res3, err := mtx.Search(SearchQuery{IndexIDs: []string{idx.ID}, Query: "hello OR француз", Limit: 1})
+	res, err := mtx.QueryIndexRecords(IndexRecordQuery{IndexIDs: []string{idxID}, CreatedBefore: time.Now(), Limit: 2})
 	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), int64(2), res3.Total)
-	assert.Equal(s.T(), 1, len(res3.Items))
-	assert.Equal(s.T(), "789", res3.NextID)
+	assert.Equal(s.T(), int64(3), res.Total)
+	assert.Equal(s.T(), 2, len(res.Items))
+	assert.Equal(s.T(), "789", res.NextID)
 
-	// delete
 	err = mtx.DeleteIndexRecord(rec.ID)
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteIndex(idx.ID)
+	err = mtx.DeleteIndexRecord(rec.ID)
+	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
+}
+
+func (s *pureSqlTestSuite) TestSearch() {
+	mtx := s.db.NewModelTx()
+
+	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteFormat(frmt.Name)
+	vec, err := NewVector(bas, FromNumber(7), FromString("word"))
 	assert.Nil(s.T(), err)
+
+	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	assert.Nil(s.T(), err)
+	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	assert.Nil(s.T(), err)
+
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
+	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec})
+	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndexRecord(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
+	assert.Nil(s.T(), err)
+
+	res, err := mtx.Search(SearchQuery{IndexIDs: []string{idxID}, Query: "hello OR француз", Limit: 1})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), int64(2), res.Total)
+	assert.Equal(s.T(), 1, len(res.Items))
+	assert.Equal(s.T(), "789", res.NextID)
+}
+
+func (s *pureSqlTestSuite) TestConstraints() {
+	mtx := s.db.NewModelTx()
+
+	bas, err := NewBasis(Dimension{Name: "page", Type: DTypeNumber, Min: 0, Max: 10}, Dimension{Name: "mark", Type: DTypeString, Min: 3, Max: 20})
+	assert.Nil(s.T(), err)
+	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	assert.Nil(s.T(), err)
+	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	assert.Nil(s.T(), err)
+
+	err = mtx.DeleteFormat("pdf")
+	assert.ErrorIs(s.T(), err, errors.ErrConflict)
 }
