@@ -4,22 +4,22 @@ Simila search service
 
 ## Quick start
 
-### 1. Run Simila
+### 1. Start Simila
 
 ```bash
 make compose-up
 ```
 
-### 2. Use the API
-```bash
-curl localhost:8081/v1/ping # http API
-grpcurl --plaintext localhost:50052 grpc.health.v1.Health/Check # grpc API 
-```
-
-### 3. Tail logs (optional)
+### 2. Tail logs (optional)
 
 ```bash
 make compose-logs
+```
+
+### 3. Use the API
+```bash
+curl localhost:8081/v1/ping # http API
+grpcurl --plaintext localhost:50052 grpc.health.v1.Health/Check # grpc API 
 ```
 
 ### 4. Stop Simila
