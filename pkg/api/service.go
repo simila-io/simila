@@ -73,7 +73,8 @@ func (s *Service) FormatServiceServer() format.ServiceServer {
 // createIndex allows to create a new index. The body represents a file stream,
 // if presents. body may be nil, then the body may be taken from the request.
 func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexRequest, body io.Reader) (*index.Index, error) {
-	s.logger.Infof("createIndex(): request=%s, body?=%t", request, body != nil)
+	s.logger.Infof("createIndex(): id=%s, format=%s, tags=%v records=%d, documentSize=%d, body?=%t", request.Id,
+		request.Format, request.Tags, len(request.Records), len(request.Document), body != nil)
 	if request == nil {
 		return &index.Index{}, errors.GRPCWrap(errors.ErrInvalid)
 	}
