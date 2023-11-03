@@ -134,9 +134,9 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	assert.Equal(s.T(), 2, len(res.Items))
 	assert.Equal(s.T(), IndexRecordID{IndexID: idxID, RecordID: "789"}.Encode(), res.NextID)
 
-	err = mtx.DeleteIndexRecord(rec.ID)
+	err = mtx.DeleteIndexRecords(rec.ID)
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteIndexRecord(rec.ID)
+	err = mtx.DeleteIndexRecords(rec.ID)
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
 }
 

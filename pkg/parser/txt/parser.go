@@ -39,7 +39,8 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 	tp.logger.Infof("scanning for id=%s", idxId)
 
 	scanner := bufio.NewScanner(body)
-	recs := []persistence.IndexRecord{}
+	var recs []persistence.IndexRecord
+
 	line := 0
 	for scanner.Scan() {
 		line++

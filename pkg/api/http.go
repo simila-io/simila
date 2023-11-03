@@ -37,6 +37,10 @@ type HttpEP struct {
 	logger logging.Logger
 }
 
+type ErrorMsg struct {
+	Error string `json:"error"`
+}
+
 func NewHttpEP(svc *Service) *HttpEP {
 	return &HttpEP{svc: svc, logger: logging.NewLogger("api.rest")}
 }
@@ -278,7 +282,7 @@ func (hep *HttpEP) errorRespnse(c *gin.Context, err error, msg string) bool {
 	}
 	status := http.StatusInternalServerError
 	defer func() {
-		c.JSON(status, msg)
+		c.JSON(status, ErrorMsg{Error: msg})
 		hep.logger.Warnf("%s %s -> %d %s", c.Request.Method, c.Request.URL, status, msg)
 		hep.logger.Debugf("original error: %s", err)
 	}()

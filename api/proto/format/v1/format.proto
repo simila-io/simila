@@ -12,7 +12,7 @@ service Service {
   // Get returns format by its name
   rpc Get(Id) returns (Format);
   // Delete allows to delete an existing format
-  rpc Delete(Id) returns (Format);
+  rpc Delete(Id) returns (google.protobuf.Empty);
   // List returns all known formats
   rpc List(google.protobuf.Empty) returns (Formats);
 }

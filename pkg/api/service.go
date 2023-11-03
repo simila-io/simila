@@ -130,22 +130,53 @@ func (s *Service) searchRecords(ctx context.Context, request *index.SearchRecord
 
 func (s *Service) createFormat(ctx context.Context, req *format.Format) (*format.Format, error) {
 	s.logger.Infof("createFormat(): request=%s", req)
-	return &format.Format{}, errors.ErrNotExist
+	if req == nil {
+		return &format.Format{}, errors.ErrInvalid
+	}
+	mtx := s.Db.NewModelTx()
+	if _, err := mtx.CreateFormat(persistence.Format{Name: req.Name}); err != nil {
+		return &format.Format{}, err
+	}
+	return &format.Format{Name: req.Name}, nil
 }
 
 func (s *Service) getFormat(ctx context.Context, id *format.Id) (*format.Format, error) {
 	s.logger.Debugf("getFormat(): id=%s", id)
-	return &format.Format{}, errors.ErrNotExist
+	if id == nil {
+		return &format.Format{}, errors.ErrInvalid
+	}
+	mtx := s.Db.NewModelTx()
+	frmt, err := mtx.GetFormat((*id).Id)
+	if err != nil {
+		return &format.Format{}, err
+	}
+	return &format.Format{Name: frmt.Name}, nil
 }
 
-func (s *Service) deleteFormat(ctx context.Context, id *format.Id) (*format.Format, error) {
+func (s *Service) deleteFormat(ctx context.Context, id *format.Id) (*emptypb.Empty, error) {
 	s.logger.Infof("deleteFormat(): id=%s", id)
-	return &format.Format{}, errors.ErrNotExist
+	if id == nil {
+		return &emptypb.Empty{}, errors.ErrInvalid
+	}
+	mtx := s.Db.NewModelTx()
+	if err := mtx.DeleteFormat((*id).Id); err != nil {
+		return &emptypb.Empty{}, err
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Service) listFormat(ctx context.Context, empty *emptypb.Empty) (*format.Formats, error) {
 	s.logger.Debugf("listFormat()")
-	return &format.Formats{}, errors.ErrNotExist
+	mtx := s.Db.NewModelTx()
+	mFrmts, err := mtx.ListFormats()
+	if err != nil {
+		return &format.Formats{}, err
+	}
+	aFrmts := make([]*format.Format, len(mFrmts))
+	for i := 0; i < len(mFrmts); i++ {
+		aFrmts[i] = &format.Format{Name: mFrmts[i].Name}
+	}
+	return &format.Formats{Formats: aFrmts}, nil
 }
 
 // -------------------------- index.Service ---------------------------
@@ -182,18 +213,18 @@ func (ids idxService) SearchRecords(ctx context.Context, request *index.SearchRe
 }
 
 // ----------------------------- format.Service ---------------------------------
-func (f fmtService) Create(ctx context.Context, f2 *format.Format) (*format.Format, error) {
-	return f.s.createFormat(ctx, f2)
+func (fs fmtService) Create(ctx context.Context, f *format.Format) (*format.Format, error) {
+	return fs.s.createFormat(ctx, f)
 }
 
-func (f fmtService) Get(ctx context.Context, id *format.Id) (*format.Format, error) {
-	return f.s.getFormat(ctx, id)
+func (fs fmtService) Get(ctx context.Context, id *format.Id) (*format.Format, error) {
+	return fs.s.getFormat(ctx, id)
 }
 
-func (f fmtService) Delete(ctx context.Context, id *format.Id) (*format.Format, error) {
-	return f.s.deleteFormat(ctx, id)
+func (fs fmtService) Delete(ctx context.Context, id *format.Id) (*emptypb.Empty, error) {
+	return fs.s.deleteFormat(ctx, id)
 }
 
-func (f fmtService) List(ctx context.Context, empty *emptypb.Empty) (*format.Formats, error) {
-	return f.s.listFormat(ctx, empty)
+func (fs fmtService) List(ctx context.Context, empty *emptypb.Empty) (*format.Formats, error) {
+	return fs.s.listFormat(ctx, empty)
 }

@@ -57,14 +57,14 @@ type (
 		// QueryIndexes lists query matching index entries
 		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
 
-		// CreateIndexRecords creates index records entry
+		// CreateIndexRecords creates index records entries
 		CreateIndexRecords(records []IndexRecord) error
 		// GetIndexRecord retrieves index record entry by ID
 		GetIndexRecord(ID string) (IndexRecord, error)
 		// UpdateIndexRecord updates index record
 		UpdateIndexRecord(record IndexRecord) error
-		// DeleteIndexRecord deletes index record by ID
-		DeleteIndexRecord(ID string) error
+		// DeleteIndexRecords deletes index records by IDs
+		DeleteIndexRecords(ID ...string) error
 		// QueryIndexRecords lists query matching index record entries
 		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
 

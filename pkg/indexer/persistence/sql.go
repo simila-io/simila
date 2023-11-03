@@ -166,6 +166,9 @@ func (t *tx) ExecScript(sqlScript string) error {
 // ============================== modelTx ====================================
 
 func (m *modelTx) CreateFormat(format Format) (string, error) {
+	if len(format.Name) == 0 {
+		return "", fmt.Errorf("format name must be non-empty: %w", errors.ErrInvalid)
+	}
 	if len(format.Basis) == 0 {
 		format.Basis = []byte("{}")
 	}
@@ -431,8 +434,25 @@ func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 	return nil
 }
 
-func (m *modelTx) DeleteIndexRecord(ID string) error {
-	res, err := m.executor().Exec("delete from index_record where id=$1", ID)
+func (m *modelTx) DeleteIndexRecords(IDs ...string) error {
+	sb := strings.Builder{}
+	args := make([]any, 0)
+
+	sb.WriteString("delete from index_record where id in (")
+	oldLen := sb.Len()
+	for _, id := range IDs {
+		if len(args) > oldLen {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("?")
+		args = append(args, id)
+	}
+	sb.WriteString(")")
+	if len(args) == 0 {
+		return nil
+	}
+
+	res, err := m.executor().Exec(sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
 		return mapError(err)
 	}
