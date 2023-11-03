@@ -15,6 +15,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
@@ -24,6 +25,7 @@ import (
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/simila-io/simila/pkg/parser"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 )
 
@@ -73,24 +75,36 @@ func (s *Service) FormatServiceServer() format.ServiceServer {
 func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexRequest, body io.Reader) (*index.Index, error) {
 	s.logger.Infof("createIndex(): request=%s, body?=%t", request, body != nil)
 	var p parser.Parser
+	if body == nil && len(request.Document) > 0 {
+		body = bytes.NewReader(request.Document)
+		s.logger.Infof("createIndex(): will use Document for reading records")
+	}
 	if body != nil {
 		p = s.PProvider.Parser(request.Format)
 		if p == nil {
-			return &index.Index{}, fmt.Errorf("the format %s is not supported: %w", request.Format, errors.ErrInvalid)
+			return &index.Index{}, errors.GRPCWrap(fmt.Errorf("the format %s is not supported: %w", request.Format, errors.ErrInvalid))
 		}
 	}
 
 	mtx := s.Db.NewModelTx()
 	defer mtx.Commit()
 
-	//TODO: no tags yet
-	_, err := mtx.CreateIndex(persistence.Index{ID: request.Id, Format: request.Format})
+	idx, err := mtx.CreateIndex(persistence.Index{ID: request.Id, Format: request.Format, Tags: request.Tags})
 	if err != nil {
 		mtx.Rollback()
-		return nil, fmt.Errorf("could not create new index with ID=%s: %w", request.Id, err)
+		return nil, errors.GRPCWrap(fmt.Errorf("could not create new index with ID=%s: %w", request.Id, err))
 	}
 
-	return &index.Index{}, nil
+	if p != nil {
+		count, err := p.ScanRecords(ctx, mtx, request.Id, body)
+		if err != nil {
+			mtx.Rollback()
+			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %s format: %w", request.Format, err))
+		}
+		s.logger.Infof("createIndex(): read %d records by parser %s for the new index %s", count, p, request.Id)
+	}
+
+	return IndexDb2Proc(idx), nil
 }
 
 func (s *Service) deleteIndex(ctx context.Context, id *index.Id) (*emptypb.Empty, error) {
@@ -196,4 +210,13 @@ func (f fmtService) Delete(ctx context.Context, id *format.Id) (*format.Format, 
 
 func (f fmtService) List(ctx context.Context, empty *emptypb.Empty) (*format.Formats, error) {
 	return f.s.listFormat(ctx, empty)
+}
+
+func IndexDb2Proc(idx persistence.Index) *index.Index {
+	return &index.Index{
+		Id:        idx.ID,
+		Format:    idx.Format,
+		Tags:      idx.Tags,
+		CreatedAt: timestamppb.New(idx.CreatedAt),
+	}
 }

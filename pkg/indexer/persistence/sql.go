@@ -206,9 +206,9 @@ func (m *modelTx) ListFormats() ([]Format, error) {
 	return scanRows[Format](rows)
 }
 
-func (m *modelTx) CreateIndex(index Index) (string, error) {
+func (m *modelTx) CreateIndex(index Index) (Index, error) {
 	if len(index.ID) == 0 {
-		return "", fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
+		return index, fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
 	}
 	if index.Tags == nil {
 		index.Tags = make(Tags)
@@ -218,9 +218,9 @@ func (m *modelTx) CreateIndex(index Index) (string, error) {
 	_, err := m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
 		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
 	if err != nil {
-		return "", mapError(err)
+		return index, mapError(err)
 	}
-	return index.ID, nil
+	return index, nil
 }
 
 func (m *modelTx) GetIndex(ID string) (Index, error) {

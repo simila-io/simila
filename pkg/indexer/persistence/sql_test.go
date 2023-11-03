@@ -70,7 +70,8 @@ func (s *pureSqlTestSuite) TestIndex() {
 	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
 
-	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	idxID := i1.ID
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), "abc.txt", idxID)
 
@@ -107,7 +108,8 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 
 	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
-	idxID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	idxID := i1.ID
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.ErrorIs(s.T(), err, errors.ErrExist)
@@ -152,9 +154,11 @@ func (s *pureSqlTestSuite) TestSearch() {
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateFormat(Format{Name: "doc", Basis: bas})
 	assert.Nil(s.T(), err)
-	idx1ID, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
+	idx1ID := i1.ID
 	assert.Nil(s.T(), err)
-	idx2ID, err := mtx.CreateIndex(Index{ID: "def.txt", Format: "doc", Tags: Tags{"org": "123"}})
+	i2, err := mtx.CreateIndex(Index{ID: "def.txt", Format: "doc", Tags: Tags{"org": "123"}})
+	idx2ID := i2.ID
 	assert.Nil(s.T(), err)
 
 	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec}})

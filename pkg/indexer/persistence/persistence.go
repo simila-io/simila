@@ -47,7 +47,7 @@ type (
 		ListFormats() ([]Format, error)
 
 		// CreateIndex creates index entry based on source ID
-		CreateIndex(index Index) (string, error)
+		CreateIndex(index Index) (Index, error)
 		// GetIndex retrieves index info by ID
 		GetIndex(ID string) (Index, error)
 		// UpdateIndex updates index info
