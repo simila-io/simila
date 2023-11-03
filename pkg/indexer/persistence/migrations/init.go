@@ -18,6 +18,11 @@ import migrate "github.com/rubenv/sql-migrate"
 
 const (
 	initUp = `
+drop table if exists "index_record";
+drop table if exists "index";
+drop table if exists "format";
+drop extension if exists pgroonga;
+
 create extension pgroonga;
 
 create table if not exists "format"
@@ -69,6 +74,13 @@ drop table if exists "format";
 
 drop extension pgroonga;
 `
+
+	addTxtFormatUp = `
+insert into format (id, name) values('txt', 'txt') on conflict do nothing;
+`
+	addTxtFormatDown = `
+delete from format where id='txt';
+`
 )
 
 func InitTable(id string) *migrate.Migration {
@@ -76,5 +88,13 @@ func InitTable(id string) *migrate.Migration {
 		Id:   id,
 		Up:   []string{initUp},
 		Down: []string{initDown},
+	}
+}
+
+func AddTxtFormat(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:   id,
+		Up:   []string{addTxtFormatUp},
+		Down: []string{addTxtFormatDown},
 	}
 }

@@ -58,6 +58,7 @@ func migrateUp(db *sql.DB) error {
 	migrs := []*migrate.Migration{}
 	migrs = append(migrs, dummy("0"))
 	migrs = append(migrs, migrations.InitTable("1"))
+	migrs = append(migrs, migrations.AddTxtFormat("2"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -71,6 +72,7 @@ func migrateDown(db *sql.DB) error {
 	migrs := make([]*migrate.Migration, 0)
 	migrs = append(migrs, dummy("0"))
 	migrs = append(migrs, migrations.InitTable("1"))
+	migrs = append(migrs, migrations.AddTxtFormat("2"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}

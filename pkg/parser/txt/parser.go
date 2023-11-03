@@ -45,11 +45,11 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 	for scanner.Scan() {
 		line++
 		sgmnt := scanner.Text()
-		sgmnt = strings.Trim(sgmnt, "\t\n\v\f\r\x85\xA0")
-		if len(sgmnt) == 0 {
+		trimmed := strings.Trim(sgmnt, " \t\n\v\f\r\x85\xA0")
+		if len(trimmed) == 0 {
 			continue
 		}
-		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", line), Segment: scanner.Text()})
+		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", line), Segment: sgmnt})
 		if len(recs) >= 100 {
 			if err := mtx.CreateIndexRecords(recs...); err != nil {
 				return 0, err

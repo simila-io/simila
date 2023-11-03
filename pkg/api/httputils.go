@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"github.com/simila-io/simila/api/gen/index/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 type (
@@ -52,6 +54,17 @@ type (
 		Records      []*Record `json:"records,omitempty"`
 		NextRecordId *string   `json:"nextRecordId,omitempty"`
 	}
+
+	Index struct {
+		// id the index uniquely identifier
+		Id string `json:"id,omitempty"`
+		// format - the index format
+		Format string `json:"format,omitempty"`
+		// tags the list of key:value pairs associated with the index
+		Tags map[string]string `json:"tags,omitempty"`
+		// createdAt the timestamp when the index was created
+		CreatedAt time.Time `json:"createdAt,omitempty"`
+	}
 )
 
 func CreateIndexRequest2Proto(ci CreateIndexRequest) *index.CreateIndexRequest {
@@ -91,8 +104,11 @@ func PatchIndexRecordsRequest2Proto(pr PatchRecordsRequest) *index.PatchRecordsR
 	}
 }
 
-func SearchRecordsResult2Rest(srr *index.SearchRecordsResult) SearchRecordsResult {
-	return SearchRecordsResult{
+func SearchRecordsResult2Rest(srr *index.SearchRecordsResult) *SearchRecordsResult {
+	if srr == nil {
+		return nil
+	}
+	return &SearchRecordsResult{
 		Records:    IndexRecords2Rest(srr.Records),
 		NextPageId: srr.NextPageId,
 	}
@@ -135,9 +151,31 @@ func Record2Rest(r *index.Record) *Record {
 	}
 }
 
-func ListRecordsResult2Proto(lrr *index.ListRecordsResult) ListRecordsResult {
-	return ListRecordsResult{
+func ListRecordsResult2Proto(lrr *index.ListRecordsResult) *ListRecordsResult {
+	if lrr == nil {
+		return nil
+	}
+	return &ListRecordsResult{
 		Records:      Records2Rest(lrr.Records),
 		NextRecordId: lrr.NextRecordId,
 	}
+}
+
+func Index2Rest(r *index.Index) *Index {
+	if r == nil {
+		return nil
+	}
+	return &Index{
+		Id:        r.Id,
+		Format:    r.Format,
+		Tags:      r.Tags,
+		CreatedAt: protoTime2Time(r.CreatedAt),
+	}
+}
+
+func protoTime2Time(pt *timestamppb.Timestamp) time.Time {
+	if pt == nil {
+		return time.Time{}
+	}
+	return pt.AsTime()
 }

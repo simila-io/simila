@@ -113,7 +113,7 @@ func (hep *HttpEP) hPostIndexes(c *gin.Context) {
 		}
 	}
 	c.Header("Location", ComposeURI(c.Request, idx.Id))
-	c.JSON(http.StatusCreated, idx)
+	c.JSON(http.StatusCreated, Index2Rest(idx))
 }
 
 func (hep *HttpEP) hDeleteIndexesId(c *gin.Context) {
@@ -291,6 +291,8 @@ func (hep *HttpEP) errorRespnse(c *gin.Context, err error, msg string) bool {
 		status = http.StatusNotFound
 	} else if errors.Is(err, errors.ErrInvalid) {
 		status = http.StatusBadRequest
+	} else if errors.Is(err, errors.ErrExist) {
+		status = http.StatusConflict
 	} else if errors.Is(err, errors.ErrUnimplemented) {
 		status = http.StatusUnsupportedMediaType
 	}

@@ -63,5 +63,5 @@ or 'multipart/form-data' is also supported:
 
 example:
 ```bash
-curl -i -X POST -H "content-type: multipart/form-data" -F"file=@/Users/user/Downloads/fr_9782_size1024.jpg" -F "meta={\"id\": \"1234\", \"format\": \"jpg\"};type=application/json" http://localhost:8080/v1/indexes
+curl -i -X POST -H "content-type: multipart/form-data" -F"file=@/Users/dima/test.txt" -F "meta={\"id\": \"test.txt\", \"format\": \"txt\"};type=application/json" http://localhost:8080/v1/indexes
 ```
