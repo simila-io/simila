@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"github.com/acquirecloud/golibs/logging"
+	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	"github.com/simila-io/simila/pkg/api"
 	"github.com/simila-io/simila/pkg/grpc"
@@ -46,6 +47,7 @@ func Run(ctx context.Context, cfg *Config) error {
 	var grpcRegF grpc.RegisterF = func(gs *ggrpc.Server) error {
 		grpc_health_v1.RegisterHealthServer(gs, health.NewServer())
 		index.RegisterServiceServer(gs, gsvc.IndexServiceServer())
+		format.RegisterServiceServer(gs, gsvc.FormatServiceServer())
 		return nil
 	}
 

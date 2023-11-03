@@ -1,0 +1,38 @@
+version: "3.8"
+services:
+  engine:
+    image: simila:latest
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - docker-compose.env
+    ports:
+      - 50052:50051
+      - 8081:8080
+    healthcheck:
+      test: [ "CMD", "/bin/grpc_health_probe", "-addr=:50051" ]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+  db:
+    image: groonga/pgroonga:latest-debian-16
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: simila
+    ports:
+      - 5433:5432
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  db:
+    driver: local

@@ -4,23 +4,31 @@ Simila search service
 
 ## Quick start
 
-### 1. Run DB docker
+### 1. Run Simila
 
 ```bash
-make db-start
-```
-### 2. Create Simila DB
-
-```bash
-PGPASSWORD=postgres psql -h localhost -p 5432 -U postgres -d postgres -c "create database simila"
+make compose-up
 ```
 
-### 3. Run Simila executable
+### 2. Use the API
+```bash
+curl localhost:8081/v1/ping # http API
+grpcurl --plaintext localhost:50052 grpc.health.v1.Health/Check # grpc API 
+```
+
+### 3. Tail logs (optional)
 
 ```bash
-make run
+make compose-logs
+```
+
+### 4. Stop Simila
+
+```bash
+make compose-down
 ```
 
 ## Notes
 
-- Simila uses Postgres with the PGroonga extention enabled https://hub.docker.com/r/groonga/pgroonga. More info on PGroonga: https://pgroonga.github.io/reference/.
+- Simila uses Postgres with the PGroonga extention enabled https://hub.docker.com/r/groonga/pgroonga.  
+  More info on PGroonga: https://pgroonga.github.io/reference/ and Groonga engine https://groonga.org/docs/reference.

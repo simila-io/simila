@@ -59,7 +59,7 @@ run: build ## builds and runs the server locally: `./build/simila start`
 clean: ## clean up, removes the ./build directory
 	@rm -rf ${BUILD_DIR}
 
-all: clean builddeps build
+all: clean build
 
 # docker
 .PHONY: docker-build
@@ -86,6 +86,23 @@ db-start: ## start the postgres server locally in docker
 db-stop: ## stop the database server
 	@docker stop postgres-db
 	@echo "Database stopped"
+
+.PHONY: docker-rmi
+docker-rmi: ## removes the docker image
+	docker rmi -f $(shell docker images --filter=reference=${IMAGE_NAME} -q | uniq)
+
+# docker-compose
+.PHONY: compose-up
+compose-up: docker-build ## run the docker compose
+	docker-compose -f docker-compose.yaml up --detach
+
+.PHONY: compose-down
+compose-down:  ## stop the docker compose
+	docker-compose -f docker-compose.yaml down
+
+.PHONY: compose-logs
+compose-logs:  ## show the docker compose logs
+	docker-compose -f docker-compose.yaml logs --follow
 
 # generate help info from comments: thanks to https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 .PHONY: help
