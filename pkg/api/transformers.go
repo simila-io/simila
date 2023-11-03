@@ -12,6 +12,9 @@ func toApiFormat(mFmt persistence.Format) *format.Format {
 }
 
 func toModelFormat(aFmt *format.Format) persistence.Format {
+	if aFmt == nil {
+		return persistence.Format{}
+	}
 	return persistence.Format{ID: aFmt.Name}
 }
 
@@ -25,10 +28,16 @@ func toApiIndex(mIdx persistence.Index) *index.Index {
 }
 
 func toModelIndex(aIdx *index.Index) persistence.Index {
+	if aIdx == nil {
+		return persistence.Index{}
+	}
 	return persistence.Index{ID: aIdx.Id, Format: aIdx.Format}
 }
 
 func toModelIndexFromApiCreateIdxReq(request *index.CreateIndexRequest) persistence.Index {
+	if request == nil {
+		return persistence.Index{}
+	}
 	return persistence.Index{ID: request.Id, Tags: request.Tags, Format: request.Format}
 }
 
@@ -39,16 +48,10 @@ func toApiIndexRecord(mItem persistence.SearchQueryResultItem) *index.IndexRecor
 	}
 }
 
-func toModelIndexRecord(aRec *index.IndexRecord) persistence.IndexRecord {
-	return persistence.IndexRecord{
-		ID:      aRec.IndexRecord.Id,
-		IndexID: aRec.IndexId,
-		Segment: aRec.IndexRecord.Segment,
-		Vector:  aRec.IndexRecord.Vector,
-	}
-}
-
 func toModelIndexRecordFromApiRecord(indexID string, aRec *index.Record) persistence.IndexRecord {
+	if aRec == nil {
+		return persistence.IndexRecord{}
+	}
 	return persistence.IndexRecord{
 		ID:      aRec.Id,
 		IndexID: indexID,

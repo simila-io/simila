@@ -94,7 +94,7 @@ func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexReq
 	defer func() {
 		_ = mtx.Rollback()
 	}()
-	idx, err := mtx.CreateIndex(persistence.Index{ID: request.Id, Format: request.Format, Tags: request.Tags})
+	idx, err := mtx.CreateIndex(toModelIndexFromApiCreateIdxReq(request))
 	if err != nil {
 		return nil, errors.GRPCWrap(fmt.Errorf("could not create new index with ID=%s: %w", request.Id, err))
 	}
