@@ -39,17 +39,18 @@ type (
 	// exec is a helper interface to provide joined functionality of sqlx.DB and sqlx.Tx
 	// it is used by the tx.executor()
 	exec interface {
-		sqlx.Queryer
+		sqlx.QueryerContext
 		sqlx.Ext
-		Get(dest interface{}, query string, args ...interface{}) error
+		GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 		QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	}
 
 	// tx implements the Tx interface
 	tx struct {
-		db *sqlx.DB // never nil
-		tx *sqlx.Tx // keeps active transaction, if it exists. It can be nil, if not started.
+		ctx context.Context // context for all the operations within the tx
+		db  *sqlx.DB        // never nil
+		tx  *sqlx.Tx        // keeps active transaction, if it exists. It can be nil, if not started.
 	}
 
 	// modelTx is a helper to persist persistence objects ModelTx
@@ -88,13 +89,13 @@ func (d *db) Shutdown() {
 }
 
 // NewModelTx returns the new ModelTx object
-func (d *db) NewModelTx() ModelTx {
-	return &modelTx{tx: d.NewTx().(*tx)}
+func (d *db) NewModelTx(ctx context.Context) ModelTx {
+	return &modelTx{tx: d.NewTx(ctx).(*tx)}
 }
 
 // NewTx returns the new Tx object
-func (d *db) NewTx() Tx {
-	return &tx{db: d.db}
+func (d *db) NewTx(ctx context.Context) Tx {
+	return &tx{ctx: ctx, db: d.db}
 }
 
 // ============================== tx ====================================
@@ -109,12 +110,12 @@ func (t *tx) executor() exec {
 // MustBegin is a part of the Tx interface
 func (t *tx) MustBegin() {
 	t.Commit()
-	t.tx = t.db.MustBegin()
+	t.tx = t.db.MustBeginTx(t.ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted, ReadOnly: false})
 }
 
 // MustBeginSerializable is a part of the Tx interface
-func (t *tx) MustBeginSerializable(ctx context.Context) {
-	tx := t.db.MustBeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
+func (t *tx) MustBeginSerializable() {
+	tx := t.db.MustBeginTx(t.ctx, &sql.TxOptions{Isolation: sql.LevelSerializable, ReadOnly: false})
 	t.Commit()
 	t.tx = tx
 }
@@ -140,7 +141,7 @@ func (t *tx) Commit() error {
 
 // ExecQuery executes a query with params within the transaction
 func (t *tx) execQuery(sqlQuery string, params ...interface{}) error {
-	_, err := t.executor().Exec(sqlQuery, params...)
+	_, err := t.executor().ExecContext(t.ctx, sqlQuery, params...)
 	return err
 }
 
@@ -166,13 +167,16 @@ func (t *tx) ExecScript(sqlScript string) error {
 // ============================== modelTx ====================================
 
 func (m *modelTx) CreateFormat(format Format) (string, error) {
+	if len(format.Name) == 0 {
+		return "", fmt.Errorf("format name must be non-empty: %w", errors.ErrInvalid)
+	}
 	if len(format.Basis) == 0 {
 		format.Basis = []byte("{}")
 	}
 	format.ID = ulidutils.NewID()
 	format.CreatedAt = time.Now()
 	format.UpdatedAt = format.CreatedAt
-	_, err := m.executor().Exec("insert into format (id, name, basis, created_at, updated_at) values ($1, $2, $3, $4, $5)",
+	_, err := m.executor().ExecContext(m.ctx, "insert into format (id, name, basis, created_at, updated_at) values ($1, $2, $3, $4, $5)",
 		format.ID, format.Name, format.Basis, format.CreatedAt, format.UpdatedAt)
 	if err != nil {
 		return "", mapError(err)
@@ -182,11 +186,11 @@ func (m *modelTx) CreateFormat(format Format) (string, error) {
 
 func (m *modelTx) GetFormat(name string) (Format, error) {
 	var f Format
-	return f, mapError(m.executor().Get(&f, "select * from format where name=$1", name))
+	return f, mapError(m.executor().GetContext(m.ctx, &f, "select * from format where name=$1", name))
 }
 
 func (m *modelTx) DeleteFormat(name string) error {
-	res, err := m.executor().Exec("delete from format where name=$1", name)
+	res, err := m.executor().ExecContext(m.ctx, "delete from format where name=$1", name)
 	if err != nil {
 		return mapError(err)
 	}
@@ -198,7 +202,7 @@ func (m *modelTx) DeleteFormat(name string) error {
 }
 
 func (m *modelTx) ListFormats() ([]Format, error) {
-	rows, err := m.executor().Queryx("select * from format order by name")
+	rows, err := m.executor().QueryxContext(m.ctx, "select * from format order by name")
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -215,7 +219,7 @@ func (m *modelTx) CreateIndex(index Index) (Index, error) {
 	}
 	index.CreatedAt = time.Now()
 	index.UpdatedAt = index.CreatedAt
-	_, err := m.executor().Exec("insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
+	_, err := m.executor().ExecContext(m.ctx, "insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
 		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
 	if err != nil {
 		return index, mapError(err)
@@ -225,7 +229,7 @@ func (m *modelTx) CreateIndex(index Index) (Index, error) {
 
 func (m *modelTx) GetIndex(ID string) (Index, error) {
 	var idx Index
-	return idx, mapError(m.executor().Get(&idx, "select * from index where id=$1", ID))
+	return idx, mapError(m.executor().GetContext(m.ctx, &idx, "select * from index where id=$1", ID))
 }
 
 func (m *modelTx) UpdateIndex(index Index) error {
@@ -248,7 +252,7 @@ func (m *modelTx) UpdateIndex(index Index) error {
 	sb.WriteString(", updated_at = ? where id = ?")
 	args = append(args, time.Now(), index.ID)
 
-	res, err := m.executor().Exec(sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
 		return mapError(err)
 	}
@@ -260,7 +264,7 @@ func (m *modelTx) UpdateIndex(index Index) error {
 }
 
 func (m *modelTx) DeleteIndex(ID string) error {
-	res, err := m.executor().Exec("delete from index where id=$1", ID)
+	res, err := m.executor().ExecContext(m.ctx, "delete from index where id=$1", ID)
 	if err != nil {
 		return mapError(err)
 	}
@@ -332,7 +336,7 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 		return QueryResult[Index, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index where %s order by id limit $%d", where, len(args)), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index where %s order by id limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[Index, string]{Total: total}, mapError(err)
 	}
@@ -350,7 +354,7 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 	return QueryResult[Index, string]{Items: res, NextID: nextID, Total: total}, nil
 }
 
-func (m *modelTx) CreateIndexRecords(records []IndexRecord) error {
+func (m *modelTx) CreateIndexRecords(records ...IndexRecord) error {
 	var sb strings.Builder
 	params := []any{}
 	firstIdx := 1
@@ -377,7 +381,7 @@ func (m *modelTx) CreateIndexRecords(records []IndexRecord) error {
 		params = append(params, now)
 		params = append(params, now)
 	}
-	_, err := m.executor().Exec(sb.String(), params...)
+	_, err := m.executor().ExecContext(m.ctx, sb.String(), params...)
 
 	if err != nil {
 		return mapError(err)
@@ -387,7 +391,7 @@ func (m *modelTx) CreateIndexRecords(records []IndexRecord) error {
 
 func (m *modelTx) GetIndexRecord(ID string) (IndexRecord, error) {
 	var r IndexRecord
-	return r, mapError(m.executor().Get(&r, "select * FROM index_record WHERE id=$1", ID))
+	return r, mapError(m.executor().GetContext(m.ctx, &r, "select * FROM index_record WHERE id=$1", ID))
 }
 
 func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
@@ -420,7 +424,7 @@ func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 	sb.WriteString(", updated_at = ? where id = ?")
 	args = append(args, time.Now(), record.ID)
 
-	res, err := m.executor().Exec(sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
 		return mapError(err)
 	}
@@ -431,8 +435,25 @@ func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 	return nil
 }
 
-func (m *modelTx) DeleteIndexRecord(ID string) error {
-	res, err := m.executor().Exec("delete from index_record where id=$1", ID)
+func (m *modelTx) DeleteIndexRecords(IDs ...string) error {
+	sb := strings.Builder{}
+	args := make([]any, 0)
+
+	sb.WriteString("delete from index_record where id in (")
+	oldLen := sb.Len()
+	for _, id := range IDs {
+		if len(args) > oldLen {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("?")
+		args = append(args, id)
+	}
+	sb.WriteString(")")
+	if len(args) == 0 {
+		return nil
+	}
+
+	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
 		return mapError(err)
 	}
@@ -500,7 +521,7 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 		return QueryResult[IndexRecord, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().Queryx(fmt.Sprintf("select * from index_record where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index_record where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{Total: total}, mapError(err)
 	}
@@ -592,7 +613,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		return QueryResult[SearchQueryResultItem, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().Queryx(fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
 		"inner join index on index.id = index_record.index_id where %s order by index_id asc, id asc limit $%d", qryDistinct, where, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
@@ -612,7 +633,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 }
 
 func (m *modelTx) getCount(query string, params ...any) (int64, error) {
-	rows, err := m.executor().Query(query, params...)
+	rows, err := m.executor().QueryContext(m.ctx, query, params...)
 	if err != nil {
 		return -1, mapError(err)
 	}

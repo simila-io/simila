@@ -15,6 +15,7 @@
 package persistence
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/acquirecloud/golibs/errors"
 	_ "github.com/lib/pq"
@@ -33,7 +34,7 @@ func TestRepositoryTestSuite(t *testing.T) {
 }
 
 func (s *pureSqlTestSuite) TestFormat() {
-	mtx := s.db.NewModelTx()
+	mtx := s.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
@@ -63,7 +64,7 @@ func (s *pureSqlTestSuite) TestFormat() {
 }
 
 func (s *pureSqlTestSuite) TestIndex() {
-	mtx := s.db.NewModelTx()
+	mtx := s.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
@@ -99,7 +100,7 @@ func (s *pureSqlTestSuite) TestIndex() {
 }
 
 func (s *pureSqlTestSuite) TestIndexRecord() {
-	mtx := s.db.NewModelTx()
+	mtx := s.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
@@ -114,11 +115,11 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.ErrorIs(s.T(), err, errors.ErrExist)
 
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
 	assert.Nil(s.T(), err)
 
 	rec, err := mtx.GetIndexRecord("789")
@@ -136,14 +137,14 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	assert.Equal(s.T(), 2, len(res.Items))
 	assert.Equal(s.T(), IndexRecordID{IndexID: idxID, RecordID: "789"}.Encode(), res.NextID)
 
-	err = mtx.DeleteIndexRecord(rec.ID)
+	err = mtx.DeleteIndexRecords(rec.ID)
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteIndexRecord(rec.ID)
+	err = mtx.DeleteIndexRecords(rec.ID)
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
 }
 
 func (s *pureSqlTestSuite) TestSearch() {
-	mtx := s.db.NewModelTx()
+	mtx := s.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
@@ -161,15 +162,15 @@ func (s *pureSqlTestSuite) TestSearch() {
 	idx2ID := i2.ID
 	assert.Nil(s.T(), err)
 
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec})
 	assert.ErrorIs(s.T(), err, errors.ErrExist)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "456", IndexID: idx1ID, Segment: "hello world", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "456", IndexID: idx1ID, Segment: "hello world", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "789", IndexID: idx1ID, Segment: "ha no no я Français", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "789", IndexID: idx1ID, Segment: "ha no no я Français", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords([]IndexRecord{{ID: "101", IndexID: idx2ID, Segment: "万事如意 ha", Vector: vec}})
+	err = mtx.CreateIndexRecords(IndexRecord{ID: "101", IndexID: idx2ID, Segment: "万事如意 ha", Vector: vec})
 	assert.Nil(s.T(), err)
 
 	res1, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1ID, idx2ID}, Query: "(HELLO OR Français OR 如意) (-haha)", Limit: 2})
@@ -186,7 +187,7 @@ func (s *pureSqlTestSuite) TestSearch() {
 }
 
 func (s *pureSqlTestSuite) TestConstraints() {
-	mtx := s.db.NewModelTx()
+	mtx := s.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{})
 	assert.Nil(s.T(), err)

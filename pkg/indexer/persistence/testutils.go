@@ -147,7 +147,7 @@ func (s *SqlTestSuite) BeforeTest(suiteName, testName string) {
 	s.db = NewDb("postgres", s.dsp.datasource()+" dbname=simila_test").(*db)
 	assert.Nil(s.T(), s.db.Init(context.Background()))
 
-	mtx := s.db.NewTx()
+	mtx := s.db.NewTx(context.Background())
 	mtx.MustBegin()
 	defer mtx.Rollback()
 	s.setupDb()

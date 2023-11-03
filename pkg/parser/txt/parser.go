@@ -39,7 +39,8 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 	tp.logger.Infof("scanning for id=%s", idxId)
 
 	scanner := bufio.NewScanner(body)
-	recs := []persistence.IndexRecord{}
+	var recs []persistence.IndexRecord
+
 	line := 0
 	for scanner.Scan() {
 		line++
@@ -50,7 +51,7 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 		}
 		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", line), Segment: scanner.Text()})
 		if len(recs) >= 100 {
-			if err := mtx.CreateIndexRecords(recs); err != nil {
+			if err := mtx.CreateIndexRecords(recs...); err != nil {
 				return 0, err
 			}
 			recs = recs[:0]
@@ -58,7 +59,7 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 	}
 
 	if len(recs) > 0 {
-		if err := mtx.CreateIndexRecords(recs); err != nil {
+		if err := mtx.CreateIndexRecords(recs...); err != nil {
 			return 0, err
 		}
 	}

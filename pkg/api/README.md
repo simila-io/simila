@@ -1,5 +1,35 @@
 ## REST API v1
 
+## /v1/formats
+Format object:
+```
+{
+    name: "pdf"
+}
+```
+
+### Create a format
+
+```bash
+curl -XPOST -H "content-type: application/json" -d '{"name": "pdf"}' http://localhost:8080/v1/formats
+```
+### Retrieve a format
+
+```bash
+curl -XGET http://localhost:8080/v1/formats/{name}
+```
+
+### Delete a format
+
+```bash
+curl -XDELETE http://localhost:8080/v1/formats/{name}
+```
+### List all formats
+
+```bash
+curl -XGET http://localhost:8080/v1/formats
+```
+
 ## /v1/indexes
 Index object:
 ```
