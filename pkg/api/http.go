@@ -67,11 +67,11 @@ func (hep *HttpEP) hGetPing(c *gin.Context) {
 // example:
 // curl -i -X POST -H "Content-Type: multipart/form-data" -F"file=@/Users/user/Downloads/fr_9782_size1024.jpg" -F "meta={\"aa\": \"bbb\"};type=application/json" http://localhost:8080/v1/indexes
 func (hep *HttpEP) hPostIndexes(c *gin.Context) {
-	var cir index.CreateIndexRequest
+	var cir CreateIndexRequest
 	var idx *index.Index
 	if err := BindAppJson(c, &cir); err == nil {
 		hep.logger.Infof("creating new index from the json object %s", cir)
-		idx, err = hep.svc.createIndex(c, &cir, nil)
+		idx, err = hep.svc.createIndex(c, CreateIndexRequest2Proto(cir), nil)
 		if hep.errorRespnse(c, err, "") {
 			return
 		}
@@ -103,7 +103,7 @@ func (hep *HttpEP) hPostIndexes(c *gin.Context) {
 		}
 		defer file.Close()
 
-		idx, err = hep.svc.createIndex(c, &cir, file)
+		idx, err = hep.svc.createIndex(c, CreateIndexRequest2Proto(cir), file)
 		if hep.errorRespnse(c, err, "") {
 			return
 		}
@@ -186,12 +186,12 @@ func (hep *HttpEP) hGetIndexes(c *gin.Context) {
 
 func (hep *HttpEP) hPatchIndexesIdRecords(c *gin.Context) {
 	iid := c.Param("id")
-	var req index.PatchRecordsRequest
+	var req PatchRecordsRequest
 	if hep.errorRespnse(c, BindAppJson(c, &req), "") {
 		return
 	}
 	req.Id = iid
-	updated, err := hep.svc.IndexServiceServer().PatchRecords(c, &req)
+	updated, err := hep.svc.IndexServiceServer().PatchRecords(c, PatchIndexRecordsRequest2Proto(req))
 	if hep.errorRespnse(c, err, "") {
 		return
 	}
@@ -207,7 +207,7 @@ func (hep *HttpEP) hPostSearch(c *gin.Context) {
 	if hep.errorRespnse(c, err, "") {
 		return
 	}
-	c.JSON(http.StatusOK, res)
+	c.JSON(http.StatusOK, SearchRecordsResult2Rest(res))
 }
 
 func (hep *HttpEP) hGetIndexesIdRecords(c *gin.Context) {
@@ -227,7 +227,7 @@ func (hep *HttpEP) hGetIndexesIdRecords(c *gin.Context) {
 	if hep.errorRespnse(c, err, "") {
 		return
 	}
-	c.JSON(http.StatusOK, res)
+	c.JSON(http.StatusOK, ListRecordsResult2Proto(res))
 }
 
 func (hep *HttpEP) hPostFormats(c *gin.Context) {
