@@ -24,7 +24,7 @@ type (
 		// MustBegin starts the transaction
 		MustBegin()
 		// MustBeginSerializable starts new transaction with Serializable isolation level
-		MustBeginSerializable(ctx context.Context)
+		MustBeginSerializable()
 		// Commit commits the changes made within the transaction
 		Commit() error
 		// Rollback rolls the transaction back
@@ -58,7 +58,7 @@ type (
 		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
 
 		// CreateIndexRecords creates index records entries
-		CreateIndexRecords(records []IndexRecord) error
+		CreateIndexRecords(records ...IndexRecord) error
 		// GetIndexRecord retrieves index record entry by ID
 		GetIndexRecord(ID string) (IndexRecord, error)
 		// UpdateIndexRecord updates index record
@@ -79,8 +79,8 @@ type (
 	// Db interface exposes
 	Db interface {
 		// NewModelTx creates new ModelTx object
-		NewModelTx() ModelTx
+		NewModelTx(ctx context.Context) ModelTx
 		// NewTx creates Tx object
-		NewTx() Tx
+		NewTx(ctx context.Context) Tx
 	}
 )

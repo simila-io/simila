@@ -80,7 +80,7 @@ func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexReq
 		}
 	}
 
-	mtx := s.Db.NewModelTx()
+	mtx := s.Db.NewModelTx(ctx)
 	defer mtx.Commit()
 
 	//TODO: no tags yet
@@ -133,7 +133,7 @@ func (s *Service) createFormat(ctx context.Context, req *format.Format) (*format
 	if req == nil {
 		return &format.Format{}, errors.ErrInvalid
 	}
-	mtx := s.Db.NewModelTx()
+	mtx := s.Db.NewModelTx(ctx)
 	if _, err := mtx.CreateFormat(persistence.Format{Name: req.Name}); err != nil {
 		return &format.Format{}, err
 	}
@@ -145,7 +145,7 @@ func (s *Service) getFormat(ctx context.Context, id *format.Id) (*format.Format,
 	if id == nil {
 		return &format.Format{}, errors.ErrInvalid
 	}
-	mtx := s.Db.NewModelTx()
+	mtx := s.Db.NewModelTx(ctx)
 	frmt, err := mtx.GetFormat((*id).Id)
 	if err != nil {
 		return &format.Format{}, err
@@ -158,7 +158,7 @@ func (s *Service) deleteFormat(ctx context.Context, id *format.Id) (*emptypb.Emp
 	if id == nil {
 		return &emptypb.Empty{}, errors.ErrInvalid
 	}
-	mtx := s.Db.NewModelTx()
+	mtx := s.Db.NewModelTx(ctx)
 	if err := mtx.DeleteFormat((*id).Id); err != nil {
 		return &emptypb.Empty{}, err
 	}
@@ -167,7 +167,7 @@ func (s *Service) deleteFormat(ctx context.Context, id *format.Id) (*emptypb.Emp
 
 func (s *Service) listFormat(ctx context.Context, empty *emptypb.Empty) (*format.Formats, error) {
 	s.logger.Debugf("listFormat()")
-	mtx := s.Db.NewModelTx()
+	mtx := s.Db.NewModelTx(ctx)
 	mFrmts, err := mtx.ListFormats()
 	if err != nil {
 		return &format.Formats{}, err
