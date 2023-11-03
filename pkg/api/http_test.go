@@ -1,9 +1,8 @@
 package api
 
 import (
-	"github.com/simila-io/simila/api/gen/index/v1"
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/encoding/protojson"
 	"testing"
 )
 
@@ -13,13 +12,13 @@ func TestJson2ProtoIndexRecord(t *testing.T) {
 		"segment": "hello world",
 		"vector": ["any string", "1234"]
 	}`
-	var r index.Record
-	assert.Nil(t, protojson.Unmarshal([]byte(irjs), &r))
+	var r Record
+	assert.Nil(t, json.Unmarshal([]byte(irjs), &r))
 	cijs := `{
 		"id": "dGVzdCB2YWx1ZQ==",
 		"format": "pdf", 
 		"records": [{"segment": "la la la", "vector": ["dd", "ff"]}] 
 	}`
-	var ci index.CreateIndexRequest
-	assert.Nil(t, protojson.Unmarshal([]byte(cijs), &ci))
+	var ci CreateIndexRequest
+	assert.Nil(t, json.Unmarshal([]byte(cijs), &ci))
 }
