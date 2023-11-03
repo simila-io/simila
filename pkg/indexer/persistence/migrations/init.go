@@ -27,21 +27,19 @@ create extension pgroonga;
 
 create table if not exists "format"
 (
-    "id"          varchar(64)              not null,
-	"name"     	  varchar(255)             not null,
+    "id"          varchar(255)             not null,
     "basis"       jsonb                    not null default '{}'::jsonb,
     "created_at"  timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at"  timestamp with time zone not null default (now() at time zone 'utc'),
     primary key ("id")
 );
 
-create unique index if not exists "idx_format_name" ON "format" ("name");
 create index if not exists "idx_format_basis" on "format" using gin ("basis");
 
 create table if not exists "index"
 (
     "id"         varchar(255)             not null,
-    "format"  	 varchar(255)             not null references "format" ("name") on delete restrict,
+    "format"  	 varchar(255)             not null references "format" ("id") on delete restrict,
     "tags"       jsonb                    not null default '{}'::jsonb,
     "created_at" timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at" timestamp with time zone not null default (now() at time zone 'utc'),
@@ -72,11 +70,11 @@ drop table if exists "index_record";
 drop table if exists "index";
 drop table if exists "format";
 
-drop extension pgroonga;
+drop extension if exists pgroonga;
 `
 
 	addTxtFormatUp = `
-insert into format (id, name) values('txt', 'txt') on conflict do nothing;
+insert into format (id) values('txt') on conflict do nothing;
 `
 	addTxtFormatDown = `
 delete from format where id='txt';

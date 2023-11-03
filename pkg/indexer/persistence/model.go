@@ -29,7 +29,6 @@ type (
 
 	Format struct {
 		ID        string    `db:"id"`
-		Name      string    `db:"name"`
 		Basis     Basis     `db:"basis"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`

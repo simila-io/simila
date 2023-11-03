@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
-	"github.com/acquirecloud/golibs/ulidutils"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"os"
@@ -166,31 +165,30 @@ func (t *tx) ExecScript(sqlScript string) error {
 
 // ============================== modelTx ====================================
 
-func (m *modelTx) CreateFormat(format Format) (string, error) {
-	if len(format.Name) == 0 {
-		return "", fmt.Errorf("format name must be non-empty: %w", errors.ErrInvalid)
+func (m *modelTx) CreateFormat(format Format) (Format, error) {
+	if len(format.ID) == 0 {
+		return Format{}, fmt.Errorf("format ID must be non-empty: %w", errors.ErrInvalid)
 	}
 	if len(format.Basis) == 0 {
 		format.Basis = []byte("{}")
 	}
-	format.ID = ulidutils.NewID()
 	format.CreatedAt = time.Now()
 	format.UpdatedAt = format.CreatedAt
-	_, err := m.executor().ExecContext(m.ctx, "insert into format (id, name, basis, created_at, updated_at) values ($1, $2, $3, $4, $5)",
-		format.ID, format.Name, format.Basis, format.CreatedAt, format.UpdatedAt)
+	_, err := m.executor().ExecContext(m.ctx, "insert into format (id, basis, created_at, updated_at) values ($1, $2, $3, $4)",
+		format.ID, format.Basis, format.CreatedAt, format.UpdatedAt)
 	if err != nil {
-		return "", mapError(err)
+		return Format{}, mapError(err)
 	}
-	return format.ID, nil
+	return format, nil
 }
 
-func (m *modelTx) GetFormat(name string) (Format, error) {
+func (m *modelTx) GetFormat(ID string) (Format, error) {
 	var f Format
-	return f, mapError(m.executor().GetContext(m.ctx, &f, "select * from format where name=$1", name))
+	return f, mapError(m.executor().GetContext(m.ctx, &f, "select * from format where id=$1", ID))
 }
 
-func (m *modelTx) DeleteFormat(name string) error {
-	res, err := m.executor().ExecContext(m.ctx, "delete from format where name=$1", name)
+func (m *modelTx) DeleteFormat(ID string) error {
+	res, err := m.executor().ExecContext(m.ctx, "delete from format where id=$1", ID)
 	if err != nil {
 		return mapError(err)
 	}
@@ -202,7 +200,7 @@ func (m *modelTx) DeleteFormat(name string) error {
 }
 
 func (m *modelTx) ListFormats() ([]Format, error) {
-	rows, err := m.executor().QueryxContext(m.ctx, "select * from format order by name")
+	rows, err := m.executor().QueryxContext(m.ctx, "select * from format order by id")
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -212,7 +210,7 @@ func (m *modelTx) ListFormats() ([]Format, error) {
 
 func (m *modelTx) CreateIndex(index Index) (Index, error) {
 	if len(index.ID) == 0 {
-		return index, fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
+		return Index{}, fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
 	}
 	if index.Tags == nil {
 		index.Tags = make(Tags)
@@ -222,7 +220,7 @@ func (m *modelTx) CreateIndex(index Index) (Index, error) {
 	_, err := m.executor().ExecContext(m.ctx, "insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
 		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
 	if err != nil {
-		return index, mapError(err)
+		return Index{}, mapError(err)
 	}
 	return index, nil
 }
@@ -354,15 +352,18 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 	return QueryResult[Index, string]{Items: res, NextID: nextID, Total: total}, nil
 }
 
-func (m *modelTx) CreateIndexRecords(records ...IndexRecord) error {
+func (m *modelTx) UpsertIndexRecords(records ...IndexRecord) error {
 	var sb strings.Builder
 	params := []any{}
 	firstIdx := 1
 	sb.WriteString("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ")
 	now := time.Now()
 	for i, r := range records {
-		if r.ID == "" {
-			return fmt.Errorf("index record for record %d ID must be specified: %w", i, errors.ErrInvalid)
+		if len(r.ID) == 0 {
+			return fmt.Errorf("record ID for item=%d  must be specified: %w", i, errors.ErrInvalid)
+		}
+		if len(r.IndexID) == 0 {
+			return fmt.Errorf("record index ID for item=%d must be specified: %w", i, errors.ErrInvalid)
 		}
 		if len(r.Vector) == 0 {
 			r.Vector = []byte("{}")
@@ -381,22 +382,31 @@ func (m *modelTx) CreateIndexRecords(records ...IndexRecord) error {
 		params = append(params, now)
 		params = append(params, now)
 	}
-	_, err := m.executor().ExecContext(m.ctx, sb.String(), params...)
-
-	if err != nil {
+	sb.WriteString(" on conflict (index_id,id) do update set (segment, vector, updated_at) = (excluded.segment, excluded.vector, excluded.updated_at)")
+	if _, err := m.executor().ExecContext(m.ctx, sb.String(), params...); err != nil {
 		return mapError(err)
 	}
 	return nil
 }
 
-func (m *modelTx) GetIndexRecord(ID string) (IndexRecord, error) {
+func (m *modelTx) GetIndexRecord(ID, indexID string) (IndexRecord, error) {
+	if len(ID) == 0 {
+		return IndexRecord{}, fmt.Errorf("record ID must be specified: %w", errors.ErrInvalid)
+	}
+	if len(indexID) == 0 {
+		return IndexRecord{}, fmt.Errorf("record index ID must be specified: %w", errors.ErrInvalid)
+	}
+
 	var r IndexRecord
-	return r, mapError(m.executor().GetContext(m.ctx, &r, "select * FROM index_record WHERE id=$1", ID))
+	return r, mapError(m.executor().GetContext(m.ctx, &r, "select * FROM index_record WHERE index_id=$1 and id=$2", indexID, ID))
 }
 
 func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 	if len(record.ID) == 0 {
-		return fmt.Errorf("index record ID must be specified: %w", errors.ErrInvalid)
+		return fmt.Errorf("record ID must be specified: %w", errors.ErrInvalid)
+	}
+	if len(record.IndexID) == 0 {
+		return fmt.Errorf("record index ID must be specified: %w", errors.ErrInvalid)
 	}
 
 	sb := strings.Builder{}
@@ -421,8 +431,8 @@ func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 		return nil
 	}
 
-	sb.WriteString(", updated_at = ? where id = ?")
-	args = append(args, time.Now(), record.ID)
+	sb.WriteString(", updated_at = ? where index_id = ? and id = ?")
+	args = append(args, time.Now(), record.IndexID, record.ID)
 
 	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
@@ -435,33 +445,38 @@ func (m *modelTx) UpdateIndexRecord(record IndexRecord) error {
 	return nil
 }
 
-func (m *modelTx) DeleteIndexRecords(IDs ...string) error {
-	sb := strings.Builder{}
-	args := make([]any, 0)
+func (m *modelTx) DeleteIndexRecords(records ...IndexRecord) (int, error) {
+	if len(records) == 0 {
+		return 0, nil
+	}
 
-	sb.WriteString("delete from index_record where id in (")
-	oldLen := sb.Len()
-	for _, id := range IDs {
-		if len(args) > oldLen {
-			sb.WriteString(", ")
+	recIDs := make([]string, len(records))
+	idxIDs := make([]string, len(records))
+
+	for i := 0; i < len(records); i++ {
+		if len(records[i].ID) == 0 {
+			return 0, fmt.Errorf("record ID for item=%d  must be specified: %w", i, errors.ErrInvalid)
 		}
-		sb.WriteString("?")
-		args = append(args, id)
-	}
-	sb.WriteString(")")
-	if len(args) == 0 {
-		return nil
+		if len(records[i].IndexID) == 0 {
+			return 0, fmt.Errorf("record index ID for item=%d must be specified: %w", i, errors.ErrInvalid)
+		}
+		recIDs[i] = records[i].ID
+		idxIDs[i] = records[i].IndexID
 	}
 
-	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	idsList, idsArgs, _ := sqlx.In("?", recIDs)
+	idxIDsList, idxIDsArgs, _ := sqlx.In("?", idxIDs)
+
+	qry := fmt.Sprintf("delete from index_record where index_id in (%s) and id in (%s)", idxIDsList, idsList)
+	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, qry), append(idxIDsArgs, idsArgs...)...)
 	if err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
 	cnt, _ := res.RowsAffected()
 	if cnt == 0 {
-		return errors.ErrNotExist
+		return 0, errors.ErrNotExist
 	}
-	return nil
+	return int(cnt), nil
 }
 
 func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error) {

@@ -38,11 +38,11 @@ type (
 		Tx
 
 		// CreateFormat creates format entry
-		CreateFormat(format Format) (string, error)
-		// GetFormat retrieves format entry by name
-		GetFormat(name string) (Format, error)
-		// DeleteFormat deletes format entry by name (only if not referenced)
-		DeleteFormat(name string) error
+		CreateFormat(format Format) (Format, error)
+		// GetFormat retrieves format entry by ID
+		GetFormat(ID string) (Format, error)
+		// DeleteFormat deletes format entry by ID (only if not referenced)
+		DeleteFormat(ID string) error
 		// ListFormats lists all the existing format entries
 		ListFormats() ([]Format, error)
 
@@ -57,14 +57,14 @@ type (
 		// QueryIndexes lists query matching index entries
 		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
 
-		// CreateIndexRecords creates index records entries
-		CreateIndexRecords(records ...IndexRecord) error
-		// GetIndexRecord retrieves index record entry by ID
-		GetIndexRecord(ID string) (IndexRecord, error)
+		// UpsertIndexRecords creates or updates index record entries
+		UpsertIndexRecords(records ...IndexRecord) error
+		// GetIndexRecord retrieves index record entry
+		GetIndexRecord(ID, indexID string) (IndexRecord, error)
 		// UpdateIndexRecord updates index record
 		UpdateIndexRecord(record IndexRecord) error
-		// DeleteIndexRecords deletes index records by IDs
-		DeleteIndexRecords(ID ...string) error
+		// DeleteIndexRecords deletes index record entries
+		DeleteIndexRecords(records ...IndexRecord) (int, error)
 		// QueryIndexRecords lists query matching index record entries
 		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
 

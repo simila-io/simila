@@ -39,16 +39,16 @@ func (s *pureSqlTestSuite) TestFormat() {
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
 
-	frmtID, err := mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	frmt, err := mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
-	assert.NotEqual(s.T(), "", frmtID)
+	assert.NotEqual(s.T(), "", frmt.ID)
 
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.ErrorIs(s.T(), err, errors.ErrExist)
 
-	frmt, err := mtx.GetFormat("pdf")
+	frmt, err = mtx.GetFormat("pdf")
 	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), "pdf", frmt.Name)
+	assert.Equal(s.T(), "pdf", frmt.ID)
 
 	_, err = mtx.GetFormat("notFound")
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
@@ -57,9 +57,9 @@ func (s *pureSqlTestSuite) TestFormat() {
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), 1, len(fmts))
 
-	err = mtx.DeleteFormat(frmt.Name)
+	err = mtx.DeleteFormat(frmt.ID)
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteFormat(frmt.Name)
+	err = mtx.DeleteFormat(frmt.ID)
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
 }
 
@@ -68,15 +68,14 @@ func (s *pureSqlTestSuite) TestIndex() {
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
 	assert.Nil(s.T(), err)
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
 
-	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
-	idxID := i1.ID
+	idx, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)
-	assert.Equal(s.T(), "abc.txt", idxID)
+	assert.Equal(s.T(), "abc.txt", idx.ID)
 
-	idx, err := mtx.GetIndex(idxID)
+	idx, err = mtx.GetIndex(idx.ID)
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), "abc.txt", idx.ID)
 
@@ -107,40 +106,41 @@ func (s *pureSqlTestSuite) TestIndexRecord() {
 	vec, err := json.Marshal([]any{7, "word"})
 	assert.Nil(s.T(), err)
 
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
-	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
-	idxID := i1.ID
+	idx, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.ErrorIs(s.T(), err, errors.ErrExist)
 
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idxID, Segment: "haha", Vector: vec})
+	err = mtx.UpsertIndexRecords(IndexRecord{ID: "123", IndexID: idx.ID, Segment: "haha", Vector: vec},
+		IndexRecord{ID: "456", IndexID: idx.ID, Segment: "hello world", Vector: vec},
+		IndexRecord{ID: "789", IndexID: idx.ID, Segment: "no no я француз", Vector: vec})
 	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "456", IndexID: idxID, Segment: "hello world", Vector: vec})
-	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "789", IndexID: idxID, Segment: "no no я француз", Vector: vec})
+	err = mtx.UpsertIndexRecords(IndexRecord{ID: "456", IndexID: idx.ID, Segment: "hello world", Vector: vec})
 	assert.Nil(s.T(), err)
 
-	rec, err := mtx.GetIndexRecord("789")
+	rec, err := mtx.GetIndexRecord("789", idx.ID)
 	assert.Nil(s.T(), err)
-	_, err = mtx.GetIndexRecord("notFound")
+	_, err = mtx.GetIndexRecord("notFound", idx.ID)
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
 
 	rec.Segment = "no no я француз haha too"
 	err = mtx.UpdateIndexRecord(rec)
 	assert.Nil(s.T(), err)
 
-	res, err := mtx.QueryIndexRecords(IndexRecordQuery{IndexIDs: []string{idxID}, CreatedBefore: time.Now(), Limit: 2})
+	res, err := mtx.QueryIndexRecords(IndexRecordQuery{IndexIDs: []string{idx.ID}, CreatedBefore: time.Now(), Limit: 2})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(3), res.Total)
 	assert.Equal(s.T(), 2, len(res.Items))
-	assert.Equal(s.T(), IndexRecordID{IndexID: idxID, RecordID: "789"}.Encode(), res.NextID)
+	assert.Equal(s.T(), IndexRecordID{IndexID: idx.ID, RecordID: "789"}.Encode(), res.NextID)
 
-	err = mtx.DeleteIndexRecords(rec.ID)
+	n, err := mtx.DeleteIndexRecords(rec)
 	assert.Nil(s.T(), err)
-	err = mtx.DeleteIndexRecords(rec.ID)
+	assert.Equal(s.T(), 1, n)
+	n, err = mtx.DeleteIndexRecords(rec)
 	assert.ErrorIs(s.T(), err, errors.ErrNotExist)
+	assert.Equal(s.T(), 0, n)
 }
 
 func (s *pureSqlTestSuite) TestSearch() {
@@ -151,35 +151,29 @@ func (s *pureSqlTestSuite) TestSearch() {
 	vec, err := json.Marshal([]any{7, "word"})
 	assert.Nil(s.T(), err)
 
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
-	_, err = mtx.CreateFormat(Format{Name: "doc", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "doc", Basis: bas})
 	assert.Nil(s.T(), err)
-	i1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
-	idx1ID := i1.ID
+	idx1, err := mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)
-	i2, err := mtx.CreateIndex(Index{ID: "def.txt", Format: "doc", Tags: Tags{"org": "123"}})
-	idx2ID := i2.ID
+	idx2, err := mtx.CreateIndex(Index{ID: "def.txt", Format: "doc", Tags: Tags{"org": "123"}})
 	assert.Nil(s.T(), err)
 
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec})
-	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "123", IndexID: idx1ID, Segment: "ha haha", Vector: vec})
-	assert.ErrorIs(s.T(), err, errors.ErrExist)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "456", IndexID: idx1ID, Segment: "hello world", Vector: vec})
-	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "789", IndexID: idx1ID, Segment: "ha no no я Français", Vector: vec})
-	assert.Nil(s.T(), err)
-	err = mtx.CreateIndexRecords(IndexRecord{ID: "101", IndexID: idx2ID, Segment: "万事如意 ha", Vector: vec})
+	err = mtx.UpsertIndexRecords(
+		IndexRecord{ID: "123", IndexID: idx1.ID, Segment: "ha haha", Vector: vec},
+		IndexRecord{ID: "456", IndexID: idx1.ID, Segment: "hello world", Vector: vec},
+		IndexRecord{ID: "789", IndexID: idx1.ID, Segment: "ha no no я Français", Vector: vec},
+		IndexRecord{ID: "101", IndexID: idx2.ID, Segment: "万事如意 ha", Vector: vec})
 	assert.Nil(s.T(), err)
 
-	res1, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1ID, idx2ID}, Query: "(HELLO OR Français OR 如意) (-haha)", Limit: 2})
+	res1, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "(HELLO OR Français OR 如意) (-haha)", Limit: 2})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(3), res1.Total)
 	assert.Equal(s.T(), 2, len(res1.Items))
-	assert.Equal(s.T(), IndexRecordID{IndexID: idx2ID, RecordID: "101"}.Encode(), res1.NextID)
+	assert.Equal(s.T(), IndexRecordID{IndexID: idx2.ID, RecordID: "101"}.Encode(), res1.NextID)
 
-	res2, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1ID, idx2ID}, Query: "ha", Distinct: true, Limit: 2})
+	res2, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "ha", Distinct: true, Limit: 2})
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), int64(2), res2.Total)
 	assert.Equal(s.T(), 2, len(res2.Items))
@@ -192,7 +186,7 @@ func (s *pureSqlTestSuite) TestConstraints() {
 	bas, err := json.Marshal([]map[string]any{})
 	assert.Nil(s.T(), err)
 
-	_, err = mtx.CreateFormat(Format{Name: "pdf", Basis: bas})
+	_, err = mtx.CreateFormat(Format{ID: "pdf", Basis: bas})
 	assert.Nil(s.T(), err)
 	_, err = mtx.CreateIndex(Index{ID: "abc.txt", Format: "pdf", Tags: Tags{"key": "val"}})
 	assert.Nil(s.T(), err)

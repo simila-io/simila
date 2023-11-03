@@ -92,6 +92,7 @@ message ListRequest {
 message ListRecordsResult {
   repeated Record records = 1;
   optional string nextRecordId = 2;
+  int64 total = 3;
 }
 
 // ListRecordsRequest describes input parameters for list of records for a specific index operation
@@ -114,9 +115,8 @@ message PatchRecordsRequest {
 
 // PatchRecordsResult describes the result of the patch index's records operation
 message PatchRecordsResult {
-  int64 inserted = 1;
-  int64 updated = 2;
-  int64 deleted = 3;
+  int64 upserted = 1;
+  int64 deleted = 2;
 }
 
 // SearchRecordsRequest describes input parameters for the Search over indexes operation.
@@ -143,4 +143,5 @@ message IndexRecord {
 message SearchRecordsResult {
   repeated IndexRecord records = 1;
   optional string nextPageId = 2;
+  int64 total = 3;
 }
