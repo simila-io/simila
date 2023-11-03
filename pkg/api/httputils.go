@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	CreateIndexRequest struct {
+	createIndexRequest struct {
 		// id contains the index identifier. It may be generated or provided. If provided, caller must
 		// support it. id cannot be more than 256 bytes long
 		Id string `json:"id,omitempty"`
@@ -19,10 +19,10 @@ type (
 		// document contains the binary data for the format provided. It may be empty
 		Document []byte `json:"document,omitempty"`
 		// records contains the list of records that can be added to the index when it is created
-		Records []*Record `json:"records,omitempty"`
+		Records []*record `json:"records,omitempty"`
 	}
 
-	Record struct {
+	record struct {
 		// id is the record id - this field is populated by parser or it is provided when records are created.
 		Id string `json:"id,omitempty"`
 		// segment contains the searchable text for the record
@@ -31,31 +31,31 @@ type (
 		Vector json.RawMessage `json:"vector,omitempty"`
 	}
 
-	PatchRecordsRequest struct {
+	patchRecordsRequest struct {
 		// id is the patched index id
 		Id string `json:"id,omitempty"`
 		// upsertRecords contains the list of records that should be inserted or updated
-		UpsertRecords []*Record `json:"upsertRecords,omitempty"`
+		UpsertRecords []*record `json:"upsertRecords,omitempty"`
 		// deleteRecords contains the list of records that should be deleted
-		DeleteRecords []*Record `json:"deleteRecords,omitempty"`
+		DeleteRecords []*record `json:"deleteRecords,omitempty"`
 	}
 
-	SearchRecordsResult struct {
-		Records    []*IndexRecord `json:"records,omitempty"`
+	searchRecordsResult struct {
+		Records    []*indexRecord `json:"records,omitempty"`
 		NextPageId *string        `json:"nextPageId,omitempty"`
 	}
 
-	IndexRecord struct {
+	indexRecord struct {
 		IndexId     string  `json:"indexId,omitempty"`
-		IndexRecord *Record `json:"indexRecord,omitempty"`
+		IndexRecord *record `json:"indexRecord,omitempty"`
 	}
 
-	ListRecordsResult struct {
-		Records      []*Record `json:"records,omitempty"`
+	listRecordsResult struct {
+		Records      []*record `json:"records,omitempty"`
 		NextRecordId *string   `json:"nextRecordId,omitempty"`
 	}
 
-	Index struct {
+	indexStruct struct {
 		// id the index uniquely identifier
 		Id string `json:"id,omitempty"`
 		// format - the index format
@@ -67,28 +67,28 @@ type (
 	}
 )
 
-func CreateIndexRequest2Proto(ci CreateIndexRequest) *index.CreateIndexRequest {
+func createIndexRequest2Proto(ci createIndexRequest) *index.CreateIndexRequest {
 	return &index.CreateIndexRequest{
 		Id:       ci.Id,
 		Format:   ci.Format,
 		Tags:     ci.Tags,
 		Document: ci.Document,
-		Records:  Records2Proto(ci.Records),
+		Records:  records2Proto(ci.Records),
 	}
 }
 
-func Records2Proto(rs []*Record) []*index.Record {
+func records2Proto(rs []*record) []*index.Record {
 	if len(rs) == 0 {
 		return nil
 	}
 	res := make([]*index.Record, len(rs))
 	for i, r := range rs {
-		res[i] = Record2Proto(r)
+		res[i] = record2Proto(r)
 	}
 	return res
 }
 
-func Record2Proto(r *Record) *index.Record {
+func record2Proto(r *record) *index.Record {
 	return &index.Record{
 		Id:      r.Id,
 		Segment: r.Segment,
@@ -96,76 +96,76 @@ func Record2Proto(r *Record) *index.Record {
 	}
 }
 
-func PatchIndexRecordsRequest2Proto(pr PatchRecordsRequest) *index.PatchRecordsRequest {
+func patchIndexRecordsRequest2Proto(pr patchRecordsRequest) *index.PatchRecordsRequest {
 	return &index.PatchRecordsRequest{
 		Id:            pr.Id,
-		UpsertRecords: Records2Proto(pr.UpsertRecords),
-		DeleteRecords: Records2Proto(pr.DeleteRecords),
+		UpsertRecords: records2Proto(pr.UpsertRecords),
+		DeleteRecords: records2Proto(pr.DeleteRecords),
 	}
 }
 
-func SearchRecordsResult2Rest(srr *index.SearchRecordsResult) *SearchRecordsResult {
+func searchRecordsResult2Rest(srr *index.SearchRecordsResult) *searchRecordsResult {
 	if srr == nil {
 		return nil
 	}
-	return &SearchRecordsResult{
-		Records:    IndexRecords2Rest(srr.Records),
+	return &searchRecordsResult{
+		Records:    indexRecords2Rest(srr.Records),
 		NextPageId: srr.NextPageId,
 	}
 }
 
-func IndexRecords2Rest(irs []*index.IndexRecord) []*IndexRecord {
+func indexRecords2Rest(irs []*index.IndexRecord) []*indexRecord {
 	if len(irs) == 0 {
 		return nil
 	}
-	res := make([]*IndexRecord, len(irs))
+	res := make([]*indexRecord, len(irs))
 	for i, r := range irs {
-		res[i] = IndexRecord2Rest(r)
+		res[i] = indexRecord2Rest(r)
 	}
 	return res
 }
 
-func Records2Rest(rs []*index.Record) []*Record {
+func records2Rest(rs []*index.Record) []*record {
 	if len(rs) == 0 {
 		return nil
 	}
-	res := make([]*Record, len(rs))
+	res := make([]*record, len(rs))
 	for i, r := range rs {
-		res[i] = Record2Rest(r)
+		res[i] = record2Rest(r)
 	}
 	return res
 }
 
-func IndexRecord2Rest(ir *index.IndexRecord) *IndexRecord {
-	return &IndexRecord{
+func indexRecord2Rest(ir *index.IndexRecord) *indexRecord {
+	return &indexRecord{
 		IndexId:     ir.IndexId,
-		IndexRecord: Record2Rest(ir.IndexRecord),
+		IndexRecord: record2Rest(ir.IndexRecord),
 	}
 }
 
-func Record2Rest(r *index.Record) *Record {
-	return &Record{
+func record2Rest(r *index.Record) *record {
+	return &record{
 		Id:      r.Id,
 		Segment: r.Segment,
 		Vector:  r.Vector,
 	}
 }
 
-func ListRecordsResult2Proto(lrr *index.ListRecordsResult) *ListRecordsResult {
+func listRecordsResult2Proto(lrr *index.ListRecordsResult) *listRecordsResult {
 	if lrr == nil {
 		return nil
 	}
-	return &ListRecordsResult{
-		Records:      Records2Rest(lrr.Records),
+	return &listRecordsResult{
+		Records:      records2Rest(lrr.Records),
 		NextRecordId: lrr.NextRecordId,
 	}
 }
 
-func Index2Rest(r *index.Index) *Index {
+func index2Rest(r *index.Index) *indexStruct {
 	if r == nil {
 		return nil
 	}
-	return &Index{
+	return &indexStruct{
 		Id:        r.Id,
 		Format:    r.Format,
 		Tags:      r.Tags,

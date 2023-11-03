@@ -102,9 +102,13 @@ func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexReq
 			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %s format: %w", request.Format, err))
 		}
 		s.logger.Infof("createIndex(): read %d records by parser %s for the new index %s", count, p, request.Id)
+	} else {
+		if err := mtx.CreateIndexRecords(records2Db(idx.ID, request.Records)...); err != nil {
+			mtx.Rollback()
+			return nil, errors.GRPCWrap(fmt.Errorf("could not create the index records: %w", err))
+		}
 	}
-
-	return IndexDb2Proc(idx), nil
+	return indexDb2Proc(idx), nil
 }
 
 func (s *Service) deleteIndex(ctx context.Context, id *index.Id) (*emptypb.Empty, error) {
@@ -243,11 +247,35 @@ func (fs fmtService) List(ctx context.Context, empty *emptypb.Empty) (*format.Fo
 	return fs.s.listFormat(ctx, empty)
 }
 
-func IndexDb2Proc(idx persistence.Index) *index.Index {
+// ---------------------------- transformations boilerplate -------------------------------
+func indexDb2Proc(idx persistence.Index) *index.Index {
 	return &index.Index{
 		Id:        idx.ID,
 		Format:    idx.Format,
 		Tags:      idx.Tags,
 		CreatedAt: timestamppb.New(idx.CreatedAt),
+	}
+}
+
+func records2Db(idxId string, r []*index.Record) []persistence.IndexRecord {
+	if len(r) == 0 {
+		return nil
+	}
+	res := make([]persistence.IndexRecord, len(r))
+	for i, ir := range r {
+		res[i] = record2Db(idxId, ir)
+	}
+	return res
+}
+
+func record2Db(idxId string, r *index.Record) persistence.IndexRecord {
+	if r == nil {
+		return persistence.IndexRecord{}
+	}
+	return persistence.IndexRecord{
+		IndexID: idxId,
+		ID:      r.Id,
+		Segment: r.Segment,
+		Vector:  r.Vector,
 	}
 }
