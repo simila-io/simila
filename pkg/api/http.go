@@ -179,7 +179,7 @@ func (hep *HttpEP) hGetIndexes(c *gin.Context) {
 		if hep.errorRespnse(c, err, fmt.Sprintf("created-before must be formatted like %s", timeLayout)) {
 			return
 		}
-		req.CreatedAfter = timestamppb.New(st)
+		req.CreatedBefore = timestamppb.New(st)
 	}
 	idxs, err := hep.svc.IndexServiceServer().List(c, req)
 	if hep.errorRespnse(c, err, "") {

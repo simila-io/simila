@@ -322,9 +322,13 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 		args = append(args, query.CreatedAfter)
 	}
 
-	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	total, err := m.getCount(fmt.Sprintf("select count(*) from index where %s", where), args...)
+	if len(where) > 0 {
+		where = " where " + where
+	}
+
+	// count
+	total, err := m.getCount(fmt.Sprintf("select count(*) from index %s", where), args...)
 	if err != nil {
 		return QueryResult[Index, string]{}, mapError(err)
 	}
@@ -334,7 +338,7 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 		return QueryResult[Index, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index where %s order by id limit $%d", where, len(args)), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index %s order by id limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[Index, string]{Total: total}, mapError(err)
 	}
@@ -353,8 +357,13 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 }
 
 func (m *modelTx) UpsertIndexRecords(records ...IndexRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
+
 	var sb strings.Builder
-	params := []any{}
+	var params []any
+
 	firstIdx := 1
 	sb.WriteString("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ")
 	now := time.Now()
@@ -524,9 +533,13 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 		args = append(args, query.CreatedAfter)
 	}
 
-	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record where %s ", where), args...)
+	if len(where) > 0 {
+		where = " where " + where
+	}
+
+	// count
+	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record %s ", where), args...)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{}, mapError(err)
 	}
@@ -536,7 +549,7 @@ func (m *modelTx) QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRe
 		return QueryResult[IndexRecord, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index_record where %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index_record %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
 	if err != nil {
 		return QueryResult[IndexRecord, string]{Total: total}, mapError(err)
 	}
@@ -616,9 +629,13 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		qryDistinct = "distinct on(index_record.index_id)"
 	}
 
-	// count
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	total, err := m.getCount(fmt.Sprintf("select count(%s) from index_record inner join index on index.id = index_record.index_id where %s ", cntDistinct, where), args...)
+	if len(where) > 0 {
+		where = " where " + where
+	}
+
+	// count
+	total, err := m.getCount(fmt.Sprintf("select count(%s) from index_record inner join index on index.id = index_record.index_id %s ", cntDistinct, where), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
@@ -629,7 +646,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	}
 	args = append(args, query.Limit+1)
 	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id where %s order by index_id asc, id asc limit $%d", qryDistinct, where, len(args)), args...)
+		"inner join index on index.id = index_record.index_id %s order by index_id asc, id asc limit $%d", qryDistinct, where, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}

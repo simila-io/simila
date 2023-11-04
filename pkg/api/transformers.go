@@ -31,7 +31,7 @@ func toModelIndex(aIdx *index.Index) persistence.Index {
 	if aIdx == nil {
 		return persistence.Index{}
 	}
-	return persistence.Index{ID: aIdx.Id, Format: aIdx.Format}
+	return persistence.Index{ID: aIdx.Id, Format: aIdx.Format, Tags: aIdx.Tags}
 }
 
 func toModelIndexFromApiCreateIdxReq(request *index.CreateIndexRequest) persistence.Index {

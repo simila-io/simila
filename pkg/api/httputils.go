@@ -43,6 +43,7 @@ type (
 	searchRecordsResult struct {
 		Records    []*indexRecord `json:"records,omitempty"`
 		NextPageId *string        `json:"nextPageId,omitempty"`
+		Total      int            `json:"total"`
 	}
 
 	indexRecord struct {
@@ -53,6 +54,7 @@ type (
 	listRecordsResult struct {
 		Records      []*record `json:"records,omitempty"`
 		NextRecordId *string   `json:"nextRecordId,omitempty"`
+		Total        int       `json:"total"`
 	}
 
 	indexStruct struct {
@@ -111,6 +113,7 @@ func searchRecordsResult2Rest(srr *index.SearchRecordsResult) *searchRecordsResu
 	return &searchRecordsResult{
 		Records:    indexRecords2Rest(srr.Records),
 		NextPageId: srr.NextPageId,
+		Total:      int(srr.Total),
 	}
 }
 
@@ -158,6 +161,7 @@ func listRecordsResult2Proto(lrr *index.ListRecordsResult) *listRecordsResult {
 	return &listRecordsResult{
 		Records:      records2Rest(lrr.Records),
 		NextRecordId: lrr.NextRecordId,
+		Total:        int(lrr.Total),
 	}
 }
 
