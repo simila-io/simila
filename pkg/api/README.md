@@ -130,7 +130,7 @@ Index records update request object:
 curl -i -XPATCH -H "content-type: application/json" -d '{"upsertRecords": [{"id": "000145f6", "segment": "this is searcheable piece of the text", "vector": [1, "abc", 3]}], "deleteRecords": [{"id": "0001044f"}]}' "http://localhost:8080/v1/indexes/test.txt/records"
 ```
 
-Query result object:
+Update result object:
 ```
 {
     "upserted": 1,
