@@ -384,6 +384,48 @@ func (fs fmtService) Create(ctx context.Context, f *format.Format) (*format.Form
 	return fs.s.createFormat(ctx, f)
 }
 
+func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStreamDataServer) error {
+	req, err := server.Recv()
+	if err != nil {
+		return err
+	}
+	if req.Meta == nil {
+		return errors.GRPCWrap(fmt.Errorf("CreateWithStreamData(): first packet of the grpc stream must contain meta: %w", errors.ErrInvalid))
+	}
+	r, w := io.Pipe()
+	defer r.Close()
+	buf := req.Data
+	go func() {
+		var err error
+		defer func() {
+			defer w.CloseWithError(err)
+		}()
+		for err == nil {
+			if len(buf) > 0 {
+				n := 0
+				n, err = w.Write(buf)
+				buf = buf[n:]
+			} else {
+				var req *index.CreateIndexStreamRequest
+				req, err = server.Recv()
+				if req != nil {
+					buf = req.Data
+				}
+			}
+		}
+		if err != nil && err != io.EOF {
+			ids.s.logger.Warnf("CreateWithStreamData(): could not write data: %s", err.Error())
+		} else {
+			err = nil
+		}
+	}()
+	idx, err := ids.s.createIndex(server.Context(), req.Meta, r)
+	if err == nil {
+		server.SendAndClose(idx)
+	}
+	return err
+}
+
 func (fs fmtService) Get(ctx context.Context, id *format.Id) (*format.Format, error) {
 	return fs.s.getFormat(ctx, id)
 }

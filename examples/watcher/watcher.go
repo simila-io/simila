@@ -1,3 +1,16 @@
+// Copyright 2023 The Simila Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package main
 
 import (
@@ -79,6 +92,7 @@ func serve(ctx context.Context, path string, sc index.ServiceClient) {
 				continue
 			}
 			if err := uploadfile(ctx, path, fi, sc); err != nil {
+				logger.Errorf("could not upload file %s to the server: %s", fi.Name(), err)
 				continue
 			}
 			curFiles[fi.Name()] = fi
@@ -103,6 +117,21 @@ func serve(ctx context.Context, path string, sc index.ServiceClient) {
 }
 
 func uploadfile(ctx context.Context, dir string, fi os.FileInfo, sc index.ServiceClient) error {
+	for {
+		err := uploadfile2(ctx, dir, fi, sc)
+		if errors.Is(err, errors.ErrExist) {
+			fn := fi.Name()
+			logger.Infof("the index with id=%s already exists, let's delete it and rescan ", fn)
+			if _, err = sc.Delete(ctx, &index.Id{Id: fn}); err != nil {
+				return err
+			}
+			continue
+		}
+		return err
+	}
+}
+
+func uploadfile2(ctx context.Context, dir string, fi os.FileInfo, sc index.ServiceClient) error {
 	fn := fi.Name()
 	ext := fn[len(fn)-3:]
 	f, err := os.Open(filepath.Join(dir, fn))
@@ -112,27 +141,24 @@ func uploadfile(ctx context.Context, dir string, fi os.FileInfo, sc index.Servic
 	}
 	defer f.Close()
 
-	buf := make([]byte, fi.Size())
-	_, err = f.Read(buf)
+	cir := &index.CreateIndexRequest{Id: fn, Format: ext}
+	buf := make([]byte, 4096)
+	stream, err := sc.CreateWithStreamData(ctx)
 	if err != nil {
-		logger.Errorf("could not read file %s: %s", fn, err.Error())
+		logger.Errorf("coud not make call to the server: %s", err.Error())
 		return err
 	}
 	for {
-		_, err = sc.Create(ctx, &index.CreateIndexRequest{Id: fn, Format: ext, Document: buf})
+		n, err := f.Read(buf)
 		if err != nil {
-			if errors.Is(err, errors.ErrExist) {
-				logger.Infof("the index with id=%s already exists, let's delete it and rescan ", fn)
-				_, err = sc.Delete(ctx, &index.Id{Id: fn})
-				if err != nil {
-					logger.Errorf("could not delete the index with id=%s: %s", fn, err)
-				} else {
-					continue
-				}
-			}
-			logger.Errorf("could not create the new index for file=%s: %s", fn, err.Error())
+			break
 		}
-		break
+		err = stream.Send(&index.CreateIndexStreamRequest{Meta: cir, Data: buf[:n]})
+		if err != nil {
+			break
+		}
+		cir = nil
 	}
-	return nil
+	_, err = stream.CloseAndRecv()
+	return err
 }

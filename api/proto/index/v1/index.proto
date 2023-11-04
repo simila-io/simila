@@ -10,6 +10,8 @@ option go_package = "./index/v1;index";
 service Service {
   // Create allows to create a new index.
   rpc Create(CreateIndexRequest) returns (Index);
+  // Create allows to create a new index, streaming the records data in the request
+  rpc CreateWithStreamData(stream CreateIndexStreamRequest) returns (Index);
   // Delete allows to remove an index by its id
   rpc Delete(Id) returns (google.protobuf.Empty);
   // Get returns information about the index
@@ -40,6 +42,14 @@ message CreateIndexRequest {
   optional bytes document = 4;
   // records contains the list of records that can be added to the index when it is created
   repeated Record records = 5;
+}
+
+// CreateIndexStreamRequest wraps CreateIndexRequest OR a chunk of body stream
+message CreateIndexStreamRequest {
+    // CreateIndexRequest must be in the first packet of the gRPC stream
+    CreateIndexRequest meta = 1;
+    // data is the body data, may start from the first packet of the stream
+    bytes data = 2;
 }
 
 // Index describes an index
