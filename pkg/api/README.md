@@ -9,26 +9,26 @@ Format object:
 ```
 
 ### Create format
-POST /v1/formats
+*POST /v1/formats*
 
 ```bash
 curl -i -XPOST -H "content-type: application/json" -d '{"name": "pdf"}' "http://localhost:8080/v1/formats"
 ```
 ### Retrieve format
-GET /v1/formats/{name}
+*GET /v1/formats/{name}*
 
 ```bash
 curl -i -XGET "http://localhost:8080/v1/formats/pdf"
 ```
 
 ### Delete format
-DELETE /v1/formats/{name}
+*DELETE /v1/formats/{name}*
 
 ```bash
 curl -i -XDELETE "http://localhost:8080/v1/formats/pdf"
 ```
 ### List formats
-GET /v1/formats
+*GET /v1/formats*
 
 ```bash
 curl -i -XGET "http://localhost:8080/v1/formats"
@@ -56,7 +56,7 @@ An index record object:
 ```
 
 ### Create index 
-POST /v1/indexes
+*POST /v1/indexes*
 
 An index may be created via providing the whole data in the `content-type: application/json` body:
 
@@ -71,28 +71,28 @@ curl -i -X POST -H "content-type: multipart/form-data" -F"file=@/tmp/test.txt" -
 ```
 
 ### Update index
-PUT /v1/indexes/{id}
+*PUT /v1/indexes/{id}*
 
 ```bash
 curl -i -XPUT -H "content-type: application/json" -d '{"tags":{"k1":"v1"}}' "http://localhost:8080/v1/indexes/1234"
 ```
 
 ### Retrieve index
-GET /v1/indexes/{id}
+*GET /v1/indexes/{id}*
 
 ```bash
 curl -i -XGET "http://localhost:8080/v1/indexes/1234"
 ```
 
 ### Delete index
-DELETE /v1/indexes/{id}
+*DELETE /v1/indexes/{id}*
 
 ```bash
 curl -i -XDELETE "http://localhost:8080/v1/indexes/1234"
 ```
 
 ### Query indexes 
-GET /v1/indexes
+*GET /v1/indexes*
 
 Query parameters:
 * format={format name}
@@ -116,7 +116,7 @@ Query result object:
 ```
 
 ### Update index records
-PATCH /v1/indexes/{id}/records
+*PATCH /v1/indexes/{id}/records*
 
 Index records update request object:
 ```
@@ -139,7 +139,7 @@ Query result object:
 ```
 
 ### Query index records
-GET /v1/indexes/{id}/records
+*GET /v1/indexes/{id}/records*
 
 Query parameters:
 * start-record-id={starting record id, see the result object "nextRecordId"}
@@ -171,8 +171,8 @@ Search request object:
 }
 ```
 
-### Search index records
-POST /v1/search
+### Search records
+*POST /v1/search*
 
 ```bash
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "tags":{"k1":"v1"}, "indexIDs":["test.txt"], "pageId":"eyJpbmRleF9pZCI6InRlc3QudHh0IiwicmVjb3JkX2lkIjoiMDAwMGJhODUifQ=="}' "http://localhost:8080/v1/search"
