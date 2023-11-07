@@ -22,6 +22,8 @@ curl localhost:8081/v1/ping # http API
 grpcurl --plaintext localhost:50052 grpc.health.v1.Health/Check # grpc API 
 ```
 
+Check the [API documentation](pkg/api/README.md) for details.
+
 ### 4. Stop Simila
 
 ```bash

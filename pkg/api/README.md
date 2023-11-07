@@ -1,7 +1,9 @@
 ## REST API v1
 
 ## /v1/formats
+
 Format object:
+
 ```
 {
     name: "name of the format"
@@ -9,12 +11,15 @@ Format object:
 ```
 
 ### Create format
+
 *POST /v1/formats*
 
 ```bash
 curl -i -XPOST -H "content-type: application/json" -d '{"name": "pdf"}' "http://localhost:8080/v1/formats"
 ```
+
 ### Retrieve format
+
 *GET /v1/formats/{name}*
 
 ```bash
@@ -22,12 +27,15 @@ curl -i -XGET "http://localhost:8080/v1/formats/pdf"
 ```
 
 ### Delete format
+
 *DELETE /v1/formats/{name}*
 
 ```bash
 curl -i -XDELETE "http://localhost:8080/v1/formats/pdf"
 ```
+
 ### List formats
+
 *GET /v1/formats*
 
 ```bash
@@ -35,27 +43,31 @@ curl -i -XGET "http://localhost:8080/v1/formats"
 ```
 
 ## /v1/indexes
+
 Index create request object:
+
 ```
 {
-    id: "the index ID"
-    format: "pdf"
-    tags: ["userABC", "salesTeam"]
-    document: "a base64 encoded document, used for create new index only" 
+    id: "the index ID",
+    format: "pdf",
+    tags: ["userABC", "salesTeam"],
+    document: "a base64 encoded document, used for create new index only",
     records: [{id: "abcd", segment: "hello world", vector: [1, 2]}]
 }
 ```
 
 An index record object:
+
 ```
 {
-    id: "a base64 encoded vector"
-    segment: "this is searcheable piece of the text"
+    id: "a base64 encoded vector",
+    segment: "this is searcheable piece of the text",
     vector: [1, "abc", 3]
 }
 ```
 
-### Create index 
+### Create index
+
 *POST /v1/indexes*
 
 An index may be created via providing the whole data in the `content-type: application/json` body:
@@ -71,6 +83,7 @@ curl -i -X POST -H "content-type: multipart/form-data" -F"file=@/tmp/test.txt" -
 ```
 
 ### Update index
+
 *PUT /v1/indexes/{id}*
 
 ```bash
@@ -78,6 +91,7 @@ curl -i -XPUT -H "content-type: application/json" -d '{"tags":{"k1":"v1"}}' "htt
 ```
 
 ### Retrieve index
+
 *GET /v1/indexes/{id}*
 
 ```bash
@@ -85,16 +99,19 @@ curl -i -XGET "http://localhost:8080/v1/indexes/1234"
 ```
 
 ### Delete index
+
 *DELETE /v1/indexes/{id}*
 
 ```bash
 curl -i -XDELETE "http://localhost:8080/v1/indexes/1234"
 ```
 
-### Query indexes 
+### Query indexes
+
 *GET /v1/indexes*
 
 Query parameters:
+
 * format={format name}
 * tag={url encoded json map}
 * created-after={date in "2006-01-02T15:04:05-07:00" format}
@@ -107,6 +124,7 @@ curl -i -XGET "http://localhost:8080/v1/indexes?format=pdf&tags=%7B%22k1%22%3A%2
 ```
 
 Query result object:
+
 ```
 {
     "indexes":[],
@@ -116,9 +134,11 @@ Query result object:
 ```
 
 ### Update index records
+
 *PATCH /v1/indexes/{id}/records*
 
 Index records update request object:
+
 ```
 {
     "upsertRecords": [{id: "record id", segment: "this is searcheable piece of the text", vector: [1, "abc", 3]}],
@@ -131,6 +151,7 @@ curl -i -XPATCH -H "content-type: application/json" -d '{"upsertRecords": [{"id"
 ```
 
 Update result object:
+
 ```
 {
     "upserted": 1,
@@ -139,9 +160,11 @@ Update result object:
 ```
 
 ### Query index records
+
 *GET /v1/indexes/{id}/records*
 
 Query parameters:
+
 * start-record-id={starting record id, see the result object "nextRecordId"}
 * limit={items per page}
 
@@ -150,6 +173,7 @@ curl -i -XGET "http://localhost:8080/v1/indexes/test.txt/records?start-record-id
 ```
 
 Query result object:
+
 ```
 {
     "records": [],
@@ -159,7 +183,9 @@ Query result object:
 ```
 
 ## /v1/search
+
 Search request object:
+
 ```
 {
     "text": "a list of words that should be found",
@@ -172,6 +198,7 @@ Search request object:
 ```
 
 ### Search records
+
 *POST /v1/search*
 
 ```bash
@@ -179,6 +206,7 @@ curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "
 ```
 
 Search result object:
+
 ```
 {
     "records": [],
