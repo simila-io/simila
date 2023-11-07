@@ -206,6 +206,7 @@ Search request object:
 ```bash
 # query to iterate through all the results
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "tags":{"k1":"v1"}, "indexIDs":["test.txt"], "pageId":"eyJpbmRleF9pZCI6InRlc3QudHh0IiwicmVjb3JkX2lkIjoiMDAwMGJhODUifQ=="}' "http://localhost:8080/v1/search"
+
 # query to check the most relevant results
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "orderByScore":true, "distinct":true, "offset":25, "limit":100}' "http://localhost:8080/v1/search"
 ```
