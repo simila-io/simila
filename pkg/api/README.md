@@ -4,9 +4,9 @@
 
 Format object:
 
-```
+```json
 {
-    name: "name of the format"
+    "name": "name of the format"
 }
 ```
 
@@ -46,23 +46,23 @@ curl -i -XGET "http://localhost:8080/v1/formats"
 
 Index create request object:
 
-```
+```json
 {
-    id: "the index ID",
-    format: "pdf",
-    tags: ["userABC", "salesTeam"],
-    document: "a base64 encoded document, used for create new index only",
-    records: [{id: "abcd", segment: "hello world", vector: [1, 2]}]
+    "id": "the index ID",
+    "format": "pdf",
+    "tags": ["userABC", "salesTeam"],
+    "document": "a base64 encoded document, used for create new index only",
+    "records": [{"id": "abcd", "segment": "hello world", "vector": [1, 2]}]
 }
 ```
 
 An index record object:
 
-```
+```json
 {
-    id: "a base64 encoded vector",
-    segment: "this is searcheable piece of the text",
-    vector: [1, "abc", 3]
+    "id": "a base64 encoded vector",
+    "segment": "this is searchable piece of the text",
+    "vector": [1, "abc", 3]
 }
 ```
 
@@ -112,12 +112,12 @@ curl -i -XDELETE "http://localhost:8080/v1/indexes/1234"
 
 Query parameters:
 
-* format={format name}
-* tag={url encoded json map}
-* created-after={date in "2006-01-02T15:04:05-07:00" format}
-* created-before={date in "2006-01-02T15:04:05-07:00" format}
-* start-index-id={starting index id, see the result object "nextPageId" field}
-* limit={items per page}
+* format = {format name}
+* tag = {url encoded json map}
+* created-after = {date in "2006-01-02T15:04:05-07:00" format}
+* created-before = {date in "2006-01-02T15:04:05-07:00" format}
+* start-index-id = {starting index id, see the result object `nextPageId` field}
+* limit= {items per page}
 
 ```bash
 curl -i -XGET "http://localhost:8080/v1/indexes?format=pdf&tags=%7B%22k1%22%3A%22v1%22%7D&created-after=2006-01-02T15:04:05-07:00&created-before=2024-01-02T15:04:05-07:00&start-index-id="123"&limit=1"
@@ -125,7 +125,7 @@ curl -i -XGET "http://localhost:8080/v1/indexes?format=pdf&tags=%7B%22k1%22%3A%2
 
 Query result object:
 
-```
+```json
 {
     "indexes":[],
     "nextIndexId":"",
@@ -139,10 +139,10 @@ Query result object:
 
 Index records update request object:
 
-```
+```json
 {
-    "upsertRecords": [{id: "record id", segment: "this is searcheable piece of the text", vector: [1, "abc", 3]}],
-    "deleteRecords": [{id: "record id"}]
+    "upsertRecords": [{"id": "record id", "segment": "this is searcheable piece of the text", "vector": [1, "abc", 3]}],
+    "deleteRecords": [{"id": "record id"}]
 }
 ```
 
@@ -152,7 +152,7 @@ curl -i -XPATCH -H "content-type: application/json" -d '{"upsertRecords": [{"id"
 
 Update result object:
 
-```
+```json
 {
     "upserted": 1,
     "deleted": 1
@@ -165,8 +165,8 @@ Update result object:
 
 Query parameters:
 
-* start-record-id={starting record id, see the result object "nextRecordId"}
-* limit={items per page}
+* start-record-id = {starting record id, see the result object "nextRecordId"}
+* limit = {items per page}
 
 ```bash
 curl -i -XGET "http://localhost:8080/v1/indexes/test.txt/records?start-record-id=eyJpbmRleF9pZCI6InRlc3QudHh0IiwicmVjb3JkX2lkIjoiMDAwMDAwMDIifQ==&limit=1"
@@ -174,7 +174,7 @@ curl -i -XGET "http://localhost:8080/v1/indexes/test.txt/records?start-record-id
 
 Query result object:
 
-```
+```json
 {
     "records": [],
     "nextRecordId": "",
@@ -186,13 +186,15 @@ Query result object:
 
 Search request object:
 
-```
+```json
 {
     "text": "a list of words that should be found",
-    "tags": "a json map of {"key":"val"} tags to filter by",
+    "tags": "a json map of `{key:val}` tags to filter by",
     "indexIDs": "a list of index IDs to filter by",
     "distinct": "if true, the result will contain only one record(first) per index",
-    "pageId": "starting page id, see the result object "nextPageId" field",
+    "orderByScore": "if true, the results are ordered by the result relevancy score",
+    "pageId": "starting page id, see the result object `nextPageId` field",
+    "offset": "specifies how many records to skip before beginning to return records",
     "limit": "items per page"
 }
 ```
@@ -202,12 +204,15 @@ Search request object:
 *POST /v1/search*
 
 ```bash
+# query to iterate through all the results
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "tags":{"k1":"v1"}, "indexIDs":["test.txt"], "pageId":"eyJpbmRleF9pZCI6InRlc3QudHh0IiwicmVjb3JkX2lkIjoiMDAwMGJhODUifQ=="}' "http://localhost:8080/v1/search"
+# query to check the most relevant results
+curl -i -XPOST -H "content-type: application/json" -d '{"text": "shakespeare", "orderByScore":true, "distinct":true, "offset":25, "limit":100}' "http://localhost:8080/v1/search"
 ```
 
 Search result object:
 
-```
+```json
 {
     "records": [],
     "nextPageId": "",

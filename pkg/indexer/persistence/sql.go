@@ -297,8 +297,9 @@ func (m *modelTx) QueryIndexes(query IndexQuery) (QueryResult[Index, string], er
 		}
 		var tb strings.Builder
 		tb.WriteString(" {")
+		oldLen := tb.Len()
 		for k, v := range query.Tags {
-			if tb.Len() > 2 {
+			if tb.Len() > oldLen {
 				tb.WriteByte(',')
 			}
 			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
@@ -606,8 +607,9 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		}
 		var tb strings.Builder
 		tb.WriteString(" {")
+		oldLen := tb.Len()
 		for k, v := range query.Tags {
-			if tb.Len() > 2 {
+			if tb.Len() > oldLen {
 				tb.WriteByte(',')
 			}
 			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
@@ -623,19 +625,33 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		sb.WriteString(" index_record.segment &@~ ? ")
 		args = append(args, query.Query)
 	}
-	cntDistinct, qryDistinct := "*", ""
-	if query.Distinct {
-		cntDistinct = "distinct index_record.index_id"
-		qryDistinct = "distinct on(index_record.index_id)"
-	}
 
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
 	if len(where) > 0 {
 		where = " where " + where
 	}
 
+	distinct := ""
+	if query.Distinct {
+		if query.OrderByScore {
+			distinct = "distinct on(score, index_record.index_id)"
+		} else {
+			distinct = "distinct on(index_record.index_id)"
+		}
+	}
+
+	orderBy, limit := "", 0
+	if query.OrderByScore {
+		orderBy = "order by score desc, index_record.index_id asc"
+		limit = query.Limit // no +1, since no pagination
+	} else {
+		orderBy = "order by index_record.index_id asc, index_record.id asc"
+		limit = query.Limit + 1
+	}
+
 	// count
-	total, err := m.getCount(fmt.Sprintf("select count(%s) from index_record inner join index on index.id = index_record.index_id %s ", cntDistinct, where), args...)
+	total, err := m.getCount(fmt.Sprintf("select count(*) from (select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+		"inner join index on index.id = index_record.index_id %s %s)", distinct, where, orderBy), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
@@ -644,9 +660,10 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 	if query.Limit <= 0 {
 		return QueryResult[SearchQueryResultItem, string]{Total: total}, nil
 	}
-	args = append(args, query.Limit+1)
+
+	args = append(args, query.Offset, limit)
 	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s order by index_id asc, id asc limit $%d", qryDistinct, where, len(args)), args...)
+		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d", distinct, where, orderBy, len(args)-1, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}

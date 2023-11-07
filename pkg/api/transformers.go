@@ -11,9 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package api
 
 import (
+	"github.com/acquirecloud/golibs/cast"
 	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
@@ -54,11 +56,15 @@ func toModelIndexFromApiCreateIdxReq(request *index.CreateIndexRequest) persiste
 	return persistence.Index{ID: request.Id, Tags: request.Tags, Format: request.Format}
 }
 
-func toApiIndexRecord(mItem persistence.SearchQueryResultItem) *index.IndexRecord {
-	return &index.IndexRecord{
+func toApiSearchResultItem(mItem persistence.SearchQueryResultItem, includeScore bool) *index.SearchRecordsResultItem {
+	srr := &index.SearchRecordsResultItem{
 		IndexId:     mItem.IndexID,
 		IndexRecord: toApiRecord(mItem.IndexRecord),
 	}
+	if includeScore {
+		srr.Score = cast.Ptr(int64(cast.Value(&mItem.Score, 0)))
+	}
+	return srr
 }
 
 func toModelIndexRecordFromApiRecord(indexID string, aRec *index.Record) persistence.IndexRecord {

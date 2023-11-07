@@ -164,7 +164,10 @@ func (s *pureSqlTestSuite) TestSearch() {
 		IndexRecord{ID: "123", IndexID: idx1.ID, Segment: "ha haha", Vector: vec},
 		IndexRecord{ID: "456", IndexID: idx1.ID, Segment: "hello world", Vector: vec},
 		IndexRecord{ID: "789", IndexID: idx1.ID, Segment: "ha no no я Français", Vector: vec},
-		IndexRecord{ID: "101", IndexID: idx2.ID, Segment: "万事如意 ha", Vector: vec})
+		IndexRecord{ID: "101", IndexID: idx2.ID, Segment: "万事如意 ha", Vector: vec},
+		IndexRecord{ID: "111", IndexID: idx2.ID, Segment: "ping pong pung", Vector: vec},
+		IndexRecord{ID: "121", IndexID: idx2.ID, Segment: "pong pung", Vector: vec},
+		IndexRecord{ID: "131", IndexID: idx2.ID, Segment: "pung", Vector: vec})
 	assert.Nil(s.T(), err)
 
 	res1, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "(HELLO OR Français OR 如意) (-haha)", Limit: 2})
@@ -178,6 +181,42 @@ func (s *pureSqlTestSuite) TestSearch() {
 	assert.Equal(s.T(), int64(2), res2.Total)
 	assert.Equal(s.T(), 2, len(res2.Items))
 	assert.Equal(s.T(), "", res2.NextID)
+
+	res3, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "ping OR pong OR pung", OrderByScore: true, Limit: 10})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), int64(3), res3.Total)
+	assert.Equal(s.T(), 3, len(res3.Items))
+	assert.Equal(s.T(), "", res3.NextID)
+	assert.Equal(s.T(), 3, res3.Items[0].Score)
+	assert.Equal(s.T(), "ping pong pung", res3.Items[0].Segment)
+	assert.Equal(s.T(), 2, res3.Items[1].Score)
+	assert.Equal(s.T(), "pong pung", res3.Items[1].Segment)
+	assert.Equal(s.T(), 1, res3.Items[2].Score)
+	assert.Equal(s.T(), "pung", res3.Items[2].Segment)
+
+	res4, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "ping OR pong OR pung", OrderByScore: true, Offset: 1, Limit: 2})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), int64(3), res4.Total)
+	assert.Equal(s.T(), 2, len(res4.Items))
+	assert.Equal(s.T(), "", res4.NextID)
+	assert.Equal(s.T(), 2, res4.Items[0].Score)
+	assert.Equal(s.T(), "pong pung", res4.Items[0].Segment)
+	assert.Equal(s.T(), 1, res4.Items[1].Score)
+	assert.Equal(s.T(), "pung", res4.Items[1].Segment)
+
+	res5, err := mtx.Search(SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID}, Query: "ping OR pong OR pung OR ha", OrderByScore: true, Distinct: true, Limit: 10})
+	assert.Nil(s.T(), err)
+	assert.Equal(s.T(), int64(4), res5.Total)
+	assert.Equal(s.T(), 4, len(res5.Items))
+	assert.Equal(s.T(), "", res5.NextID)
+	assert.Equal(s.T(), 3, res5.Items[0].Score)
+	assert.Equal(s.T(), "ping pong pung", res5.Items[0].Segment)
+	assert.Equal(s.T(), 2, res5.Items[1].Score)
+	assert.Equal(s.T(), "pong pung", res5.Items[1].Segment)
+	assert.Equal(s.T(), 1, res5.Items[2].Score)
+	assert.Equal(s.T(), "ha haha", res5.Items[2].Segment)
+	assert.Equal(s.T(), 1, res5.Items[3].Score)
+	assert.Equal(s.T(), "pung", res5.Items[3].Segment)
 }
 
 func (s *pureSqlTestSuite) TestConstraints() {

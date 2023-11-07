@@ -71,12 +71,14 @@ type (
 	}
 
 	SearchQuery struct {
-		IndexIDs []string
-		Query    string // underlying search engine query
-		Tags     Tags   // index tags
-		Distinct bool   // if true, returns at most 1 result per index
-		FromID   string
-		Limit    int
+		IndexIDs     []string
+		Query        string // underlying search engine query
+		Tags         Tags   // index tags
+		Distinct     bool   // if true, returns at most 1 result per index
+		OrderByScore bool   // if true, sorts the result by the result relevancy score
+		FromID       string
+		Offset       int
+		Limit        int
 	}
 
 	SearchQueryResultItem struct {

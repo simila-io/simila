@@ -263,28 +263,31 @@ func (s *Service) searchRecords(ctx context.Context, request *index.SearchRecord
 	if request == nil {
 		return &index.SearchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
 	}
-	mtx := s.Db.NewModelTx(ctx)
+	orderByScore := cast.Bool(request.OrderByScore, false)
 	qry := persistence.SearchQuery{
-		IndexIDs: request.IndexIDs,
-		Query:    request.Text,
-		Tags:     request.Tags,
-		Distinct: cast.Bool(request.Distinct, false),
-		FromID:   cast.String(request.PageId, ""),
-		Limit:    int(cast.Int64(request.Limit, 100)),
+		IndexIDs:     request.IndexIDs,
+		Query:        request.Text,
+		Tags:         request.Tags,
+		Distinct:     cast.Bool(request.Distinct, false),
+		OrderByScore: orderByScore,
+		FromID:       cast.String(request.PageId, ""),
+		Offset:       int(cast.Int64(request.Offset, 0)),
+		Limit:        int(cast.Int64(request.Limit, 100)),
 	}
+	mtx := s.Db.NewModelTx(ctx)
 	mRecs, err := mtx.Search(qry)
 	if err != nil {
 		return &index.SearchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("index records search query failed, request=%v: %w", request, err))
 	}
-	aRecs := make([]*index.IndexRecord, len(mRecs.Items))
+	aRecs := make([]*index.SearchRecordsResultItem, len(mRecs.Items))
 	for i := 0; i < len(mRecs.Items); i++ {
-		aRecs[i] = toApiIndexRecord(mRecs.Items[i])
+		aRecs[i] = toApiSearchResultItem(mRecs.Items[i], orderByScore)
 	}
 	res := &index.SearchRecordsResult{
 		Total: mRecs.Total,
 	}
 	if len(aRecs) > 0 {
-		res.Records = aRecs
+		res.Items = aRecs
 	}
 	if len(mRecs.NextID) > 0 {
 		res.NextPageId = &mRecs.NextID

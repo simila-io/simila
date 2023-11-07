@@ -46,10 +46,10 @@ message CreateIndexRequest {
 
 // CreateIndexStreamRequest wraps CreateIndexRequest OR a chunk of body stream
 message CreateIndexStreamRequest {
-    // CreateIndexRequest must be in the first packet of the gRPC stream
-    CreateIndexRequest meta = 1;
-    // data is the body data, may start from the first packet of the stream
-    bytes data = 2;
+  // CreateIndexRequest must be in the first packet of the gRPC stream
+  CreateIndexRequest meta = 1;
+  // data is the body data, may start from the first packet of the stream
+  bytes data = 2;
 }
 
 // Index describes an index
@@ -138,9 +138,17 @@ message SearchRecordsRequest {
   // even if the index contains multiple places where the text is found. If the parameter is false,
   // or not specified, the result set will contain all found places for each index.
   optional bool distinct = 4;
-  optional string pageId = 5;
+  // orderByScore - if true the results are ordered by the result relevancy score. No cursor pagination
+  // is supported in this case (no "nextPageId" is returned in the result), the "offset" could be used to
+  // get the next page results.
+  optional bool orderByScore = 5;
+  optional string pageId = 6;
+  // offset specifies how many records to skip before beginning to return records.
+  // This parameter must be used with care since it just "skips records" (the full scan)
+  // thus it is not very performant and may create a significant load.
+  optional int64 offset = 7;
   // limit specifies the maximum number of records in the result set
-  optional int64 limit = 6;
+  optional int64 limit = 8;
 }
 
 // IndexRecord describes a record for a specific index
@@ -149,9 +157,16 @@ message IndexRecord {
   Record indexRecord = 2;
 }
 
+// SearchRecordsResultItem describes search records result item
+message SearchRecordsResultItem {
+  string indexId = 1;
+  Record indexRecord = 2;
+  optional int64 score = 3;
+}
+
 // SearchRecordsResult contains the result of a search operation
 message SearchRecordsResult {
-  repeated IndexRecord records = 1;
+  repeated SearchRecordsResultItem items = 1;
   optional string nextPageId = 2;
   int64 total = 3;
 }

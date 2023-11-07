@@ -11,10 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package api
 
 import (
 	"encoding/json"
+	"github.com/acquirecloud/golibs/cast"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -54,14 +56,15 @@ type (
 	}
 
 	searchRecordsResult struct {
-		Records    []*indexRecord `json:"records,omitempty"`
-		NextPageId *string        `json:"nextPageId,omitempty"`
-		Total      int            `json:"total"`
+		Records    []*searchRecord `json:"records,omitempty"`
+		NextPageId *string         `json:"nextPageId,omitempty"`
+		Total      int             `json:"total"`
 	}
 
-	indexRecord struct {
+	searchRecord struct {
 		IndexId     string  `json:"indexId,omitempty"`
 		IndexRecord *record `json:"indexRecord,omitempty"`
+		Score       *int    `json:"score,omitempty"`
 	}
 
 	listRecordsResult struct {
@@ -124,21 +127,32 @@ func searchRecordsResult2Rest(srr *index.SearchRecordsResult) *searchRecordsResu
 		return nil
 	}
 	return &searchRecordsResult{
-		Records:    indexRecords2Rest(srr.Records),
+		Records:    searchRecordsResultItems2Rest(srr.Items),
 		NextPageId: srr.NextPageId,
 		Total:      int(srr.Total),
 	}
 }
 
-func indexRecords2Rest(irs []*index.IndexRecord) []*indexRecord {
-	if len(irs) == 0 {
+func searchRecordsResultItems2Rest(sri []*index.SearchRecordsResultItem) []*searchRecord {
+	if len(sri) == 0 {
 		return nil
 	}
-	res := make([]*indexRecord, len(irs))
-	for i, r := range irs {
-		res[i] = indexRecord2Rest(r)
+	res := make([]*searchRecord, len(sri))
+	for i, r := range sri {
+		res[i] = searchRecordsResultItem2Rest(r)
 	}
 	return res
+}
+
+func searchRecordsResultItem2Rest(s *index.SearchRecordsResultItem) *searchRecord {
+	sri := &searchRecord{
+		IndexId:     s.IndexId,
+		IndexRecord: record2Rest(s.IndexRecord),
+	}
+	if s.Score != nil {
+		sri.Score = cast.Ptr(int(*s.Score))
+	}
+	return sri
 }
 
 func records2Rest(rs []*index.Record) []*record {
@@ -150,13 +164,6 @@ func records2Rest(rs []*index.Record) []*record {
 		res[i] = record2Rest(r)
 	}
 	return res
-}
-
-func indexRecord2Rest(ir *index.IndexRecord) *indexRecord {
-	return &indexRecord{
-		IndexId:     ir.IndexId,
-		IndexRecord: record2Rest(ir.IndexRecord),
-	}
 }
 
 func record2Rest(r *index.Record) *record {
