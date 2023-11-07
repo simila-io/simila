@@ -642,7 +642,7 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 
 	orderBy, limit := "", 0
 	if query.OrderByScore {
-		orderBy = "order by score desc, index_record.index_id asc"
+		orderBy = "order by score desc, index_record.index_id asc, index_record.id asc"
 		limit = query.Limit // no +1, since no pagination
 	} else {
 		orderBy = "order by index_record.index_id asc, index_record.id asc"

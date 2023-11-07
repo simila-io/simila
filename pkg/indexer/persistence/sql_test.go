@@ -216,7 +216,7 @@ func (s *pureSqlTestSuite) TestSearch() {
 	assert.Equal(s.T(), 1, res5.Items[2].Score)
 	assert.Equal(s.T(), "ha haha", res5.Items[2].Segment)
 	assert.Equal(s.T(), 1, res5.Items[3].Score)
-	assert.Equal(s.T(), "pung", res5.Items[3].Segment)
+	assert.Equal(s.T(), "万事如意 ha", res5.Items[3].Segment)
 }
 
 func (s *pureSqlTestSuite) TestConstraints() {
