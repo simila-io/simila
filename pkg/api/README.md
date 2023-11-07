@@ -165,7 +165,7 @@ Update result object:
 
 Query parameters:
 
-* start-record-id = {starting record id, see the result object "nextRecordId"}
+* start-record-id = {starting record id, see the result object `nextRecordId`}
 * limit = {items per page}
 
 ```bash
