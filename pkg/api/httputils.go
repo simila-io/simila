@@ -62,9 +62,10 @@ type (
 	}
 
 	searchRecord struct {
-		IndexId     string  `json:"indexId,omitempty"`
-		IndexRecord *record `json:"indexRecord,omitempty"`
-		Score       *int    `json:"score,omitempty"`
+		IndexId         string   `json:"indexId,omitempty"`
+		IndexRecord     *record  `json:"indexRecord,omitempty"`
+		MatchedKeywords []string `json:"matchedKeywords"`
+		Score           *int     `json:"score,omitempty"`
 	}
 
 	listRecordsResult struct {
@@ -146,8 +147,9 @@ func searchRecordsResultItems2Rest(sri []*index.SearchRecordsResultItem) []*sear
 
 func searchRecordsResultItem2Rest(s *index.SearchRecordsResultItem) *searchRecord {
 	sri := &searchRecord{
-		IndexId:     s.IndexId,
-		IndexRecord: record2Rest(s.IndexRecord),
+		IndexId:         s.IndexId,
+		IndexRecord:     record2Rest(s.IndexRecord),
+		MatchedKeywords: s.MatchedKeywords,
 	}
 	if s.Score != nil {
 		sri.Score = cast.Ptr(int(*s.Score))

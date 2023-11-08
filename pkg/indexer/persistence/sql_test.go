@@ -211,12 +211,22 @@ func (s *pureSqlTestSuite) TestSearch() {
 	assert.Equal(s.T(), "", res5.NextID)
 	assert.Equal(s.T(), 3, res5.Items[0].Score)
 	assert.Equal(s.T(), "ping pong pung", res5.Items[0].Segment)
+	assert.Equal(s.T(), "ping", res5.Items[0].MatchedKeywords[0])
+	assert.Equal(s.T(), "pong", res5.Items[0].MatchedKeywords[1])
+	assert.Equal(s.T(), "pung", res5.Items[0].MatchedKeywords[2])
+
 	assert.Equal(s.T(), 2, res5.Items[1].Score)
 	assert.Equal(s.T(), "pong pung", res5.Items[1].Segment)
+	assert.Equal(s.T(), "pong", res5.Items[1].MatchedKeywords[0])
+	assert.Equal(s.T(), "pung", res5.Items[1].MatchedKeywords[1])
+
 	assert.Equal(s.T(), 1, res5.Items[2].Score)
 	assert.Equal(s.T(), "ha haha", res5.Items[2].Segment)
+	assert.Equal(s.T(), "ha", res5.Items[2].MatchedKeywords[0])
+
 	assert.Equal(s.T(), 1, res5.Items[3].Score)
 	assert.Equal(s.T(), "万事如意 ha", res5.Items[3].Segment)
+	assert.Equal(s.T(), "ha", res5.Items[3].MatchedKeywords[0])
 }
 
 func (s *pureSqlTestSuite) TestConstraints() {

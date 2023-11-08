@@ -58,8 +58,9 @@ func toModelIndexFromApiCreateIdxReq(request *index.CreateIndexRequest) persiste
 
 func toApiSearchResultItem(mItem persistence.SearchQueryResultItem, includeScore bool) *index.SearchRecordsResultItem {
 	srr := &index.SearchRecordsResultItem{
-		IndexId:     mItem.IndexID,
-		IndexRecord: toApiRecord(mItem.IndexRecord),
+		IndexId:         mItem.IndexID,
+		IndexRecord:     toApiRecord(mItem.IndexRecord),
+		MatchedKeywords: mItem.MatchedKeywords,
 	}
 	if includeScore {
 		srr.Score = cast.Ptr(int64(cast.Value(&mItem.Score, 0)))

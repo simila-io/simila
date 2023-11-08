@@ -176,7 +176,7 @@ Query result object:
 
 ```json
 {
-    "records": [],
+    "records": [{"id":"","segment":"","vector":{}}],
     "nextRecordId": "",
     "total": 1
 }
@@ -215,7 +215,7 @@ Search result object:
 
 ```json
 {
-    "records": [],
+    "records": [{"indexId":"","indexRecord":{"id":"","segment":"","vector":{}}, "matchedKeywords": [], "score":2}],
     "nextPageId": "",
     "total": 1
 }

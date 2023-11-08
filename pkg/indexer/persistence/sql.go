@@ -661,9 +661,10 @@ func (m *modelTx) Search(query SearchQuery) (QueryResult[SearchQueryResultItem, 
 		return QueryResult[SearchQueryResultItem, string]{Total: total}, nil
 	}
 
-	args = append(args, query.Offset, limit)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d", distinct, where, orderBy, len(args)-1, len(args)), args...)
+	args = append(args, query.Query, query.Offset, limit)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, pgroonga_highlight_html (index_record.segment, pgroonga_query_extract_keywords($%d)) as matched_keywords, "+
+		"pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d", distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
 	if err != nil {
 		return QueryResult[SearchQueryResultItem, string]{}, mapError(err)
 	}
