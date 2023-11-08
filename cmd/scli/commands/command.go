@@ -196,7 +196,7 @@ func (c cmdSearch) Run(prompt string) error {
 			return fmt.Errorf("unexpected parameter %s", k)
 		}
 	}
-
+	req.OrderByScore = cast.Ptr(true)
 	result, err := c.isc.SearchRecords(c.ctx, req)
 	if err != nil {
 		return err
@@ -227,7 +227,7 @@ func (c cmdSearch) Prefix() string {
 }
 
 func parseParams(s string) map[string]string {
-	vals := strings.Split(strings.Trim(s, Spaces), "=")
+	vals := splitParams(s)
 	res := map[string]string{}
 	key := ""
 	for i, v := range vals {
@@ -243,7 +243,35 @@ func parseParams(s string) map[string]string {
 				v = strings.TrimRight(v[:len(v)-len(key)], Spaces)
 			}
 		}
-		res[k] = v
+		res[k] = unquote(v)
 	}
 	return res
+}
+
+func splitParams(s string) []string {
+	ss := strings.Split(s, "=")
+	res := []string{}
+	var sb strings.Builder
+	for _, v := range ss {
+		if len(v) > 0 && v[len(v)-1] == '\\' {
+			sb.WriteString(v[:len(v)-1])
+			sb.WriteString("=")
+			continue
+		}
+		sb.WriteString(v)
+		res = append(res, strings.Trim(sb.String(), Spaces))
+		sb.Reset()
+	}
+	if sb.Len() > 0 {
+		res = append(res, sb.String())
+	}
+	return res
+}
+
+func unquote(s string) string {
+	s = strings.Trim(s, " ")
+	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
