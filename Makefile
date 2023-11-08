@@ -51,6 +51,7 @@ test: ## run unit-tests
 .PHONY: build
 build: fmt-check ## builds the executable and places it to ./build/simila
 	go build -ldflags=$(LDFLAGS) -o ${BUILD_OUT} ${BUILD_SRC}
+	go build -ldflags=$(LDFLAGS) -o ${BUILD_DIR}/scli ./cmd/scli
 
 .PHONY: run
 run: build ## builds and runs the server locally: `./build/simila start`
