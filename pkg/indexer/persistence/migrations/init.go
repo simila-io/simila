@@ -79,6 +79,14 @@ insert into format (id) values('txt') on conflict do nothing;
 	addTxtFormatDown = `
 delete from format where id='txt';
 `
+	useNgramIndexUp = `
+drop index if exists "idx_index_record_segment";
+create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment") with (tokenizer='TokenNgram("unify_alphabet", false, "unify_symbol", false, "unify_digit", false)');
+`
+	useNgramIndexDown = `
+drop index if exists "idx_index_record_segment";
+create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment");
+`
 )
 
 func InitTable(id string) *migrate.Migration {
@@ -94,5 +102,13 @@ func AddTxtFormat(id string) *migrate.Migration {
 		Id:   id,
 		Up:   []string{addTxtFormatUp},
 		Down: []string{addTxtFormatDown},
+	}
+}
+
+func UseNgramIndex(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:   id,
+		Up:   []string{useNgramIndexUp},
+		Down: []string{useNgramIndexDown},
 	}
 }
