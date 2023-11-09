@@ -18,7 +18,7 @@ LDFLAGS="-X '$(MODULE)/pkg/version.Version=$(VERSION)' \
 		 -X '$(MODULE)/pkg/version.GoVersion=$(shell go version)' "
 
 # Docker image
-REGISTRY?=simila
+REGISTRY?=docker.io/simila
 IMAGE_NAME?=$(EXEC_NAME)
 IMAGE_TAG?=$(shell git rev-parse --short HEAD)
 IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
