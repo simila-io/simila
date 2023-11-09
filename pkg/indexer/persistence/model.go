@@ -107,7 +107,11 @@ func (kw *Keywords) Scan(value any) error {
 	if !ok {
 		return fmt.Errorf("not a string value in scan")
 	}
-	kwArr := strings.Split(s, "<span class=\"keyword\">")[1:]
+	kwArr := strings.Split(s, "<span class=\"keyword\">")
+	if len(kwArr) == 0 {
+		return nil
+	}
+	kwArr = kwArr[1:]
 	for i := 0; i < len(kwArr); i++ {
 		kwArr[i] = strings.Split(kwArr[i], "</span>")[0]
 	}

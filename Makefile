@@ -1,23 +1,24 @@
-# BUILD
+# Build
 MODULE=github.com/simila-io/simila
 EXEC_NAME=simila
 BUILD_DIR=./build
 TEST_DIR=$(BUILD_DIR)/utests
 BUILD_SRC=./cmd/$(EXEC_NAME)
 BUILD_OUT=$(BUILD_DIR)/$(EXEC_NAME)
+
 # Versioning/build metadata
 VERSION?=$(shell curl -s https://raw.githubusercontent.com/acquirecloud/appversion/main/version.sh | bash -s -- -s)
 REV=$(shell git rev-parse HEAD)
 NOW=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# TEST_FLAGS ?= -race
+TEST_FLAGS ?= -race
 LDFLAGS="-X '$(MODULE)/pkg/version.Version=$(VERSION)' \
 		 -X '$(MODULE)/pkg/version.GitCommit=$(REV)' \
 		 -X '$(MODULE)/pkg/version.BuildDate=$(NOW)' \
 		 -X '$(MODULE)/pkg/version.GoVersion=$(shell go version)' "
 
-#Later
-REGISTRY?=<where we host it>.dkr.ecr.us-east-2.amazonaws.com
+# Docker image
+REGISTRY?=simila
 IMAGE_NAME?=$(EXEC_NAME)
 IMAGE_TAG?=$(shell git rev-parse --short HEAD)
 IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
@@ -69,11 +70,15 @@ docker-build: ## builds the docker image
 	docker tag ${IMAGE} ${IMAGE_NAME}:latest
 
 .PHONY: docker-push
-docker-push: docker-build ## pushes docker image into registry
+docker-push: docker-build ## pushes the docker image into the registry
 	docker tag ${IMAGE} ${REGISTRY}/${IMAGE}
 	docker tag ${IMAGE} ${REGISTRY}/${IMAGE_NAME}:latest
 	docker push ${REGISTRY}/${IMAGE}
 	docker push ${REGISTRY}/${IMAGE_NAME}:latest
+
+.PHONY: docker-pull
+docker-pull: ## pulls the docker image from the registry
+	docker pull ${REGISTRY}/${IMAGE_NAME}:latest
 
 .PHONY: db-start
 db-start: ## start the postgres server locally in docker
