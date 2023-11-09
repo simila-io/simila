@@ -1,4 +1,4 @@
-![Build](https://github.com/simila-io/simila/actions/workflows/build.yaml/badge.svg) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/simila-io/simila/blob/master/LICENSE)
+![Build](https://github.com/simila-io/simila/actions/workflows/build.yaml/badge.svg) ![Docker](https://github.com/simila-io/simila/actions/workflows/docker.yaml/badge.svg) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/simila-io/simila/blob/master/LICENSE)
 # simila
 Simila search service
 
@@ -29,8 +29,3 @@ Check the [API documentation](pkg/api/README.md) for details.
 ```bash
 make compose-down
 ```
-
-## Notes
-
-- Simila uses Postgres with the PGroonga extention enabled https://hub.docker.com/r/groonga/pgroonga.  
-  More info on PGroonga: https://pgroonga.github.io/reference/ and Groonga engine https://groonga.org/docs/reference.

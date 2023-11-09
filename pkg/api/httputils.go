@@ -64,7 +64,7 @@ type (
 	searchRecord struct {
 		IndexId         string   `json:"indexId,omitempty"`
 		IndexRecord     *record  `json:"indexRecord,omitempty"`
-		MatchedKeywords []string `json:"matchedKeywords"`
+		MatchedKeywords []string `json:"matchedKeywords,omitempty"`
 		Score           *int     `json:"score,omitempty"`
 	}
 
