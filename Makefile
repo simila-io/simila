@@ -49,9 +49,12 @@ test: ## run unit-tests
 	go tool cover -html=${TEST_DIR}/c.out -o ${TEST_DIR}/coverage.html
 
 .PHONY: build
-build: fmt-check ## builds the executable and places it to ./build/simila
-	go build -ldflags=$(LDFLAGS) -o ${BUILD_OUT} ${BUILD_SRC}
-	go build -ldflags=$(LDFLAGS) -o ${BUILD_DIR}/scli ./cmd/scli
+build: fmt-check ## builds the service and the cli client executables and places them to ./build/ folder
+	go build -ldflags=$(LDFLAGS) -o ${BUILD_DIR}/ ./cmd/...
+
+.PHONY: build-examples
+build-examples: ## builds all examples and store them into ./build/examples/ folder
+	go build -ldflags=$(LDFLAGS) -o ${BUILD_DIR}/examples/ ./examples/...
 
 .PHONY: run
 run: build ## builds and runs the server locally: `./build/simila start`

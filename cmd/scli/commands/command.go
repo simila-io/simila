@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/acquirecloud/golibs/cast"
+	"github.com/fatih/color"
+	"github.com/rodaine/table"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	"sort"
 	"strings"
@@ -14,6 +16,8 @@ type (
 	// Commands represents all known commands
 	Commands struct {
 		cmds []Command
+		ctx  context.Context
+		isc  index.ServiceClient
 	}
 
 	Command interface {
@@ -29,13 +33,11 @@ type (
 	}
 
 	cmdListIndexes struct {
-		ctx context.Context
-		isc index.ServiceClient
+		cs *Commands
 	}
 
 	cmdSearch struct {
-		ctx context.Context
-		isc index.ServiceClient
+		cs *Commands
 	}
 )
 
@@ -44,10 +46,10 @@ const (
 )
 
 func New(ctx context.Context, isc index.ServiceClient) *Commands {
-	cs := &Commands{}
+	cs := &Commands{ctx: ctx, isc: isc}
 	cs.cmds = append(cs.cmds, cmdHelp{cs: cs})
-	cs.cmds = append(cs.cmds, cmdListIndexes{ctx: ctx, isc: isc})
-	cs.cmds = append(cs.cmds, cmdSearch{ctx: ctx, isc: isc})
+	cs.cmds = append(cs.cmds, cmdListIndexes{cs: cs})
+	cs.cmds = append(cs.cmds, cmdSearch{cs: cs})
 	return cs
 }
 
@@ -108,6 +110,7 @@ func (c cmdHelp) Prefix() string {
 // -------------------------------- cmdListIndexes ---------------------------------
 func (c cmdListIndexes) Run(prompt string) error {
 	req := &index.ListRequest{}
+	var asTable bool
 	params := parseParams(prompt)
 	for k, v := range params {
 		switch k {
@@ -127,18 +130,54 @@ func (c cmdListIndexes) Run(prompt string) error {
 				return fmt.Errorf("the limit value %s is wrong. limit must be a positive number", v)
 			}
 			req.Limit = cast.Ptr(int64(limit))
+		case "as-table":
+			if err := json.Unmarshal(cast.StringToByteArray(v), &asTable); err != nil {
+				return fmt.Errorf("the as-table value %s is wrong. It must be a boolean value true/false", v)
+			}
 		default:
 			return fmt.Errorf("unexpected parameter %s", k)
 		}
 	}
 
-	indexes, err := c.isc.List(c.ctx, req)
+	indexes, err := c.cs.isc.List(c.cs.ctx, req)
 	if err != nil {
 		return err
 	}
-	b, _ := json.MarshalIndent(indexes, "", "  ")
-	fmt.Println(string(b))
+	if asTable {
+		c.printAsTable(indexes)
+	} else {
+		b, _ := json.MarshalIndent(indexes, "", "  ")
+		fmt.Println(string(b))
+	}
 	return nil
+}
+
+func (c cmdListIndexes) printAsTable(idx *index.Indexes) {
+	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+	columnFmt := color.New(color.FgYellow).SprintfFunc()
+
+	tbl := table.New("Id", "Format", "Tags", "CreatedAt")
+	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
+
+	for _, r := range idx.Indexes {
+		tags := "{}"
+		if len(r.Tags) > 0 {
+			b, _ := json.Marshal(r.Tags)
+			tags = string(b)
+		}
+		tbl.AddRow(
+			r.Id,
+			r.Format,
+			tags,
+			r.CreatedAt.AsTime(),
+		)
+	}
+
+	tbl.Print()
+	if idx.NextIndexId != nil && *idx.NextIndexId != "" {
+		fmt.Println("NextIndexId: ", *idx.NextIndexId)
+	}
+	fmt.Println("Total: ", idx.Total)
 }
 
 func (c cmdListIndexes) shortDescription() string {
@@ -153,6 +192,7 @@ list indexes <params> - lists the known indexes. It accepts the following params
 	tags={"a":"a", "b":"b"} - the indexes with the tags values
 	format=<string> - the indexes for the format
 	limit=<int> - the number of records in the response
+	as-table=<bool> - prints the result in a table for
 `
 }
 
@@ -163,6 +203,7 @@ func (c cmdListIndexes) Prefix() string {
 // -------------------------------- cmdSearch ---------------------------------
 func (c cmdSearch) Run(prompt string) error {
 	req := &index.SearchRecordsRequest{}
+	var asTable bool
 	params := parseParams(prompt)
 	for k, v := range params {
 		switch k {
@@ -192,18 +233,64 @@ func (c cmdSearch) Run(prompt string) error {
 				return fmt.Errorf("the distinct value %s is wrong. distinct must be a boolean value true/false", v)
 			}
 			req.Distinct = cast.Ptr(dist)
+		case "as-table":
+			if err := json.Unmarshal(cast.StringToByteArray(v), &asTable); err != nil {
+				return fmt.Errorf("the as-table value %s is wrong. It must be a boolean value true/false", v)
+			}
 		default:
 			return fmt.Errorf("unexpected parameter %s", k)
 		}
 	}
 	req.OrderByScore = cast.Ptr(true)
-	result, err := c.isc.SearchRecords(c.ctx, req)
+	result, err := c.cs.isc.SearchRecords(c.cs.ctx, req)
 	if err != nil {
 		return err
 	}
-	b, _ := json.MarshalIndent(result, "", "  ")
-	fmt.Println(string(b))
+	if asTable {
+		c.printAsTable(result)
+	} else {
+		b, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(b))
+	}
 	return nil
+}
+
+func (c cmdSearch) printAsTable(srr *index.SearchRecordsResult) {
+	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
+	//columnFmt := color.New(color.FgYellow).SprintfFunc()
+
+	tbl := table.New("Score", "IdxId", "Keywords", "Segment")
+	tbl.WithHeaderFormatter(headerFmt)
+
+	for _, r := range srr.Items {
+		tbl.AddRow(
+			cutStr(fmt.Sprintf("%d", cast.Int64(r.Score, -1)), 5),
+			cutStr(r.IndexId, 16),
+			cutStr(fmt.Sprintf("%v", r.MatchedKeywords), 40),
+			cutToKeyword(r.IndexRecord.Segment, r.MatchedKeywords[0], 80),
+		)
+	}
+
+	tbl.Print()
+	fmt.Println("Total: ", srr.Total)
+}
+
+func cutToKeyword(s, kw string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	idx := strings.Index(s, kw)
+	if idx > maxLen && maxLen > 13 {
+		s = "..." + s[maxLen-10:]
+	}
+	return cutStr(s, maxLen)
+}
+
+func cutStr(s string, maxLen int) string {
+	if len(s) < maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func (c cmdSearch) shortDescription() string {
@@ -217,8 +304,9 @@ search <params> - returns the search results. It accepts the following params:
 	text=<string> - the query text
 	tags={"a":"a", "b":"b"} - the indexes with the tags values
 	indexes=["index1", "index2"] - the list of indexes to run the search through
-    distinct=<bool> - one record per index in the result
+	distinct=<bool> - one record per index in the result
 	limit=<int> - the number of records in the response
+	as-table=<bool> - prints the result in a table form
 `
 }
 
