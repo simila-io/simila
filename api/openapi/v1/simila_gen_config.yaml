@@ -1,0 +1,8 @@
+package: similapi
+generate:
+  models: true
+  gin-server: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
+output: genpublic/v1/simila.gen.go

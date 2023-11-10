@@ -1,0 +1,454 @@
+openapi: 3.0.3
+info:
+  title: 'Simila API'
+  description: |
+    Simila service API
+  version: 1.0.0
+paths:
+  /formats:
+    post:
+      tags:
+        - Formats
+      summary: Create new format
+      description: The call allows to create a new format if it doesn't exist yet.
+      operationId: CreateFormat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Format'
+      responses:
+        201:
+          description: The format was created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Format'
+        409:
+          description: Format with the name already exists
+    get:
+      tags:
+        - Formats
+      summary: Retreive all known formats
+      description: The call returns all known formats.
+      operationId: GetFormats
+      responses:
+        201:
+          description: The list retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Formats'
+  /formats/{formatId}:
+    get:
+      tags:
+        - Formats
+      description: Get format by its name(identifier)
+      operationId: GetFormat
+      parameters:
+        - $ref: '#/components/parameters/FormatId'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Format'
+        404:
+          description: the format is not found
+    delete:
+      tags:
+        - Formats
+      description: Delete format by its name(identifier). The format maybe deleted if it is not used and if it was created via the API call.
+      operationId: DeleteFormat
+      parameters:
+        - $ref: '#/components/parameters/FormatId'
+      responses:
+        204:
+          description: OK
+        403:
+          description: the format could not be deleted, cause it was not created by the API call
+        404:
+          description: the format is not found
+        409:
+          description: the format exists, but cannot be deleted due to some constraints
+  /indexes:
+    post:
+      tags:
+        - Indexes
+      summary: Create new index
+      description: The call allows to create a new index. The call also allows to create the index records as well.
+      operationId: CreateIndex
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIndexRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                meta:
+                  $ref: '#/components/schemas/CreateIndexRequest'
+                file: # Part2 (object)
+                  type: string
+                  format: binary
+                  description: contains the binary data for the document of the specified format
+      responses:
+        201:
+          description: The index is created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Format'
+        409:
+          description: Index with the Id already exists
+    get:
+      tags:
+        - Indexes
+      summary: Retreive indexes
+      description: The call returns all known formats.
+      operationId: GetIndexes
+      parameters:
+        - $ref: '#/components/parameters/CreatedAfter'
+        - $ref: '#/components/parameters/CreatedBefore'
+        - $ref: '#/components/parameters/StartIndexId'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Indexes'
+  /indexes/{indexId}:
+    get:
+      tags:
+        - Indexes
+      description:
+      operationId: GetIndex
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Index'
+        404:
+          description: the index with such id is not found
+    put:
+      tags:
+        - Indexes
+      description:
+      operationId: PutIndex
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Index'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Index'
+        404:
+          description: the index with such id is not found
+    delete:
+      tags:
+        - Indexes
+      description:
+      operationId: DeleteIndex
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+      responses:
+        204:
+          description: OK
+        404:
+          description: the index with such id is not found
+  /indexes/{indexId}/records:
+    get:
+      tags:
+        - Indexes
+      description:
+      operationId: GetIndexRecords
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/PageId'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordsResult'
+        404:
+          description: the index with such id is not found
+    patch:
+      tags:
+        - Indexes
+      description:
+      operationId: PatchIndexRecords
+      parameters:
+        - $ref: '#/components/parameters/IndexId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchRecordsRequest'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchRecordsResult'
+        404:
+          description: the index with such id is not found
+  /ping:
+    get:
+      tags:
+        - Ping
+      description:
+      operationId: Ping
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+  /search:
+    post:
+      tags:
+        - Search
+      description:
+      operationId: Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRecordsRecords'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordsResult'
+
+
+components:
+  schemas:
+    CreateIndexRequest:
+      type: object
+      description: The object describes a new index request.
+      required:
+        - id
+        - format
+      properties:
+        id:
+          type: string
+          description: the new index identifier. It must not be more than 64 bytes long
+        format:
+          type: string
+          description: the index format name
+        tags:
+          type: object
+          description: the key:value string pairs for the applied tags values
+          example: {
+            "tag1": "tag1Value",
+            "tag2": "tag2Value"
+          }
+        document:
+          type: string
+          format: binary
+          description: contains the binary data for the document of the specified format
+        records:
+          type: array
+          description: the list of records that must be added to the new index.
+          items:
+            $ref: '#/components/schemas/Record'
+    Format:
+      type: object
+      description: The object describes a data format.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The format name. It is used as the format identifier
+    Formats:
+      type: object
+      description: The object is used as response of contact objects query request.
+      required:
+        - formats
+      properties:
+        formats:
+          type: array
+          description: The list of all known formats
+          items:
+            $ref: '#/components/schemas/Format'
+    Index:
+      type: object
+      description: An index description
+      properties:
+        id:
+          type: string
+        format:
+          type: string
+        tags:
+          type: object
+        createAt:
+          type: string
+          format: date-time
+    Indexes:
+      type: object
+      description: The object contains information about an index record.
+      properties:
+        indexes:
+          type: array
+          description: The list of indexes
+          items:
+            $ref: '#/components/schemas/Index'
+        nextIndexId:
+          type: string
+          description: the index Id for the next page, if presents
+        total:
+          type: integer
+          description: total number of indexes that match the initial criteria
+    PatchRecordsRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        upsertRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/Record'
+        deleteRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/Record'
+    PatchRecordsResult:
+      type: object
+      properties:
+        upserted:
+          type: integer
+        deleted:
+          type: integer
+    Record:
+      type: object
+      description: The object contains information about an index record.
+      properties:
+        id:
+          type: string
+          description: the record identifier within the index. The value must be unique for the index and it is defined by the format parser.
+        segment:
+          type: string
+          description: contains the searchable text for the record.
+        vector:
+          type: string
+          format: binary
+          description: contains the vector data for the record in the format basis. The format parser defines the basis and the field structure.
+    RecordsResult:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/Record'
+        nextPageId:
+          type: string
+        total:
+          type: integer
+    SearchRecordsRecords:
+      type: object
+      properties:
+        text:
+          type: string
+        tags:
+          type: object
+        indexIDs:
+          type: array
+          items:
+            type: string
+        distinct:
+          type: boolean
+        orderByScore:
+          type: boolean
+        pageId:
+          type: string
+        offset:
+          type: integer
+        limit:
+          type: integer
+  parameters:
+    #
+    # In path params
+    #
+    FormatId:
+      name: formatId
+      in: path
+      description: The format identifier.
+      required: true
+      schema:
+        type: string
+    IndexId:
+      name: indexId
+      in: path
+      description: The index identifier.
+      required: true
+      schema:
+        type: string
+    #
+    # Query params
+    #
+    Limit:
+      in: query
+      name: limit
+      description: The limit defines the max number of objects returned per page.
+      required: false
+      schema:
+        type: integer
+    StartIndexId:
+      in: query
+      name: startIndexId
+      description: The indexId for the first record
+      required: false
+      schema:
+        type: string
+    PageId:
+      in: query
+      name: pageId
+      description: The pageId for the paging request
+      required: false
+      schema:
+        type: string
+    CreatedAfter:
+      in: query
+      name: createdAfter
+      description: start of time interval in which items are queried
+      required: false
+      schema:
+        type: string
+        format: date-time
+    CreatedBefore:
+      in: query
+      name: createdBefore
+      description: end of time interval in which items are queried
+      required: false
+      schema:
+        type: string
+        format: date-time

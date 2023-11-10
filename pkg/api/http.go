@@ -158,7 +158,7 @@ func (hep *HttpEP) hGetIndexes(c *gin.Context) {
 		req.Limit = cast.Ptr(limit)
 	}
 
-	req.StartIndexId = c.DefaultQuery("start-index-id", "")
+	req.StartIndexId = c.DefaultQuery("startIndexId", "")
 	if format := c.DefaultQuery("format", ""); format != "" {
 		req.Format = cast.Ptr(format)
 	}
@@ -167,14 +167,14 @@ func (hep *HttpEP) hGetIndexes(c *gin.Context) {
 			return
 		}
 	}
-	if ca := c.DefaultQuery("created-after", ""); ca != "" {
+	if ca := c.DefaultQuery("createdAfter", ""); ca != "" {
 		st, err := ParseTime(ca)
 		if hep.errorRespnse(c, err, fmt.Sprintf("created-after must be formatted like %s", timeLayout)) {
 			return
 		}
 		req.CreatedAfter = timestamppb.New(st)
 	}
-	if cb := c.DefaultQuery("created-before", ""); cb != "" {
+	if cb := c.DefaultQuery("createdBefore", ""); cb != "" {
 		st, err := ParseTime(cb)
 		if hep.errorRespnse(c, err, fmt.Sprintf("created-before must be formatted like %s", timeLayout)) {
 			return
@@ -224,14 +224,14 @@ func (hep *HttpEP) hGetIndexesIdRecords(c *gin.Context) {
 		}
 		req.Limit = cast.Ptr(limit)
 	}
-	if sri := c.DefaultQuery("start-record-id", ""); sri != "" {
+	if sri := c.DefaultQuery("startRecordId", ""); sri != "" {
 		req.StartRecordId = cast.Ptr(sri)
 	}
 	res, err := hep.svc.IndexServiceServer().ListRecords(c, &req)
 	if hep.errorRespnse(c, err, "") {
 		return
 	}
-	c.JSON(http.StatusOK, listRecordsResult2Proto(res))
+	c.JSON(http.StatusOK, listRecordsResult2Rest(res))
 }
 
 func (hep *HttpEP) hPostFormats(c *gin.Context) {

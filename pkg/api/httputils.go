@@ -176,7 +176,7 @@ func record2Rest(r *index.Record) *record {
 	}
 }
 
-func listRecordsResult2Proto(lrr *index.ListRecordsResult) *listRecordsResult {
+func listRecordsResult2Rest(lrr *index.ListRecordsResult) *listRecordsResult {
 	if lrr == nil {
 		return nil
 	}
