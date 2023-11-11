@@ -52,7 +52,7 @@ func Run(ctx context.Context, cfg *Config) error {
 	}
 
 	// Http API (endpoints)
-	hep := api.NewHttpEP(gsvc)
+	rst := api.NewRest(gsvc)
 
 	// DB
 	db := persistence.NewDb(cfg.DB.Driver, cfg.DB.SourceName())
@@ -63,7 +63,7 @@ func Run(ctx context.Context, cfg *Config) error {
 	inj.Register(linker.Component{Name: "", Value: migrations})
 	inj.Register(linker.Component{Name: "", Value: gsvc})
 	inj.Register(linker.Component{Name: "", Value: grpc.NewServer(grpc.Config{Transport: *cfg.GrpcTransport, RegisterEndpoints: grpcRegF})})
-	inj.Register(linker.Component{Name: "", Value: http.NewRouter(http.Config{HttpPort: cfg.HttpPort, RestRegistrar: hep.RegisterEPs})})
+	inj.Register(linker.Component{Name: "", Value: http.NewRouter(http.Config{HttpPort: cfg.HttpPort, RestRegistrar: rst.RegisterEPs})})
 	inj.Register(linker.Component{Name: "", Value: parser.NewParserProvider()})
 	inj.Register(linker.Component{Name: "", Value: txt.New()})
 

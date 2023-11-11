@@ -115,6 +115,8 @@ paths:
         - $ref: '#/components/parameters/CreatedAfter'
         - $ref: '#/components/parameters/CreatedBefore'
         - $ref: '#/components/parameters/StartIndexId'
+        - $ref: '#/components/parameters/FormatParam'
+        - $ref: '#/components/parameters/TagsParam'
         - $ref: '#/components/parameters/Limit'
       responses:
         200:
@@ -239,7 +241,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SearchRecordsRecords'
+              $ref: '#/components/schemas/SearchRequest'
       responses:
         200:
           description: OK
@@ -257,6 +259,9 @@ components:
       required:
         - id
         - format
+        - tags
+        - document
+        - records
       properties:
         id:
           type: string
@@ -265,15 +270,10 @@ components:
           type: string
           description: the index format name
         tags:
-          type: object
-          description: the key:value string pairs for the applied tags values
-          example: {
-            "tag1": "tag1Value",
-            "tag2": "tag2Value"
-          }
+          $ref: '#/components/schemas/Tags'
         document:
           type: string
-          format: binary
+          format: byte
           description: contains the binary data for the document of the specified format
         records:
           type: array
@@ -303,26 +303,34 @@ components:
     Index:
       type: object
       description: An index description
+      required:
+        - id
+        - format
+        - tags
+        - createdAt
       properties:
         id:
           type: string
         format:
           type: string
         tags:
-          type: object
-        createAt:
+          $ref: '#/components/schemas/Tags'
+        createdAt:
           type: string
           format: date-time
     Indexes:
       type: object
       description: The object contains information about an index record.
+      required:
+        - indexes
+        - total
       properties:
         indexes:
           type: array
           description: The list of indexes
           items:
             $ref: '#/components/schemas/Index'
-        nextIndexId:
+        nextPageId:
           type: string
           description: the index Id for the next page, if presents
         total:
@@ -330,6 +338,10 @@ components:
           description: total number of indexes that match the initial criteria
     PatchRecordsRequest:
       type: object
+      required:
+        - id
+        - upsertRecords
+        - deleteRecords
       properties:
         id:
           type: string
@@ -343,6 +355,9 @@ components:
             $ref: '#/components/schemas/Record'
     PatchRecordsResult:
       type: object
+      required:
+        - upserted
+        - deleted
       properties:
         upserted:
           type: integer
@@ -351,6 +366,10 @@ components:
     Record:
       type: object
       description: The object contains information about an index record.
+      required:
+        - id
+        - segment
+        - vector
       properties:
         id:
           type: string
@@ -360,10 +379,13 @@ components:
           description: contains the searchable text for the record.
         vector:
           type: string
-          format: binary
+          format: byte
           description: contains the vector data for the record in the format basis. The format parser defines the basis and the field structure.
     RecordsResult:
       type: object
+      required:
+        - records
+        - total
       properties:
         records:
           type: array
@@ -373,13 +395,22 @@ components:
           type: string
         total:
           type: integer
-    SearchRecordsRecords:
+    SearchRequest:
       type: object
+      required:
+        - text
+        - tags
+        - indexIDs
+        - distinct
+        - orderByScore
+        - pageId
+        - offset
+        - limit
       properties:
         text:
           type: string
         tags:
-          type: object
+          $ref: '#/components/schemas/Tags'
         indexIDs:
           type: array
           items:
@@ -394,6 +425,42 @@ components:
           type: integer
         limit:
           type: integer
+    SearchRecord:
+      type: object
+      required:
+        - indexId
+        - indexRecord
+        - matchedKeywords
+        - score
+      properties:
+        indexId:
+          type: string
+        indexRecord:
+          $ref: '#/components/schemas/Record'
+        matchedKeywords:
+          type: array
+          items:
+            type: string
+        score:
+          type: integer
+    SearchResult:
+      type: object
+      required:
+        - records
+        - total
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchRecord'
+        nextPageId:
+          type: string
+        total:
+          type: integer
+    Tags:
+      type: object
+      additionalProperties:
+        type: string
   parameters:
     #
     # In path params
@@ -422,6 +489,20 @@ components:
       required: false
       schema:
         type: integer
+    FormatParam:
+      in: query
+      name: format
+      description:
+      required: false
+      schema:
+        type: string
+    TagsParam:
+      in: query
+      name: tags
+      description:
+      required: false
+      schema:
+        $ref: '#/components/schemas/Tags'
     StartIndexId:
       in: query
       name: startIndexId

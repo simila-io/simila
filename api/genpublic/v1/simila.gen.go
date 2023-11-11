@@ -23,7 +23,7 @@ import (
 // CreateIndexRequest The object describes a new index request.
 type CreateIndexRequest struct {
 	// Document contains the binary data for the document of the specified format
-	Document *openapi_types.File `json:"document,omitempty"`
+	Document []byte `json:"document"`
 
 	// Format the index format name
 	Format string `json:"format"`
@@ -32,10 +32,8 @@ type CreateIndexRequest struct {
 	Id string `json:"id"`
 
 	// Records the list of records that must be added to the new index.
-	Records *[]Record `json:"records,omitempty"`
-
-	// Tags the key:value string pairs for the applied tags values
-	Tags *map[string]interface{} `json:"tags,omitempty"`
+	Records []Record `json:"records"`
+	Tags    Tags     `json:"tags"`
 }
 
 // Format The object describes a data format.
@@ -52,67 +50,87 @@ type Formats struct {
 
 // Index An index description
 type Index struct {
-	CreateAt *time.Time              `json:"createAt,omitempty"`
-	Format   *string                 `json:"format,omitempty"`
-	Id       *string                 `json:"id,omitempty"`
-	Tags     *map[string]interface{} `json:"tags,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	Format    string    `json:"format"`
+	Id        string    `json:"id"`
+	Tags      Tags      `json:"tags"`
 }
 
 // Indexes The object contains information about an index record.
 type Indexes struct {
 	// Indexes The list of indexes
-	Indexes *[]Index `json:"indexes,omitempty"`
+	Indexes []Index `json:"indexes"`
 
-	// NextIndexId the index Id for the next page, if presents
-	NextIndexId *string `json:"nextIndexId,omitempty"`
+	// NextPageId the index Id for the next page, if presents
+	NextPageId *string `json:"nextPageId,omitempty"`
 
 	// Total total number of indexes that match the initial criteria
-	Total *int `json:"total,omitempty"`
+	Total int `json:"total"`
 }
 
 // PatchRecordsRequest defines model for PatchRecordsRequest.
 type PatchRecordsRequest struct {
-	DeleteRecords *[]Record `json:"deleteRecords,omitempty"`
-	Id            *string   `json:"id,omitempty"`
-	UpsertRecords *[]Record `json:"upsertRecords,omitempty"`
+	DeleteRecords []Record `json:"deleteRecords"`
+	Id            string   `json:"id"`
+	UpsertRecords []Record `json:"upsertRecords"`
 }
 
 // PatchRecordsResult defines model for PatchRecordsResult.
 type PatchRecordsResult struct {
-	Deleted  *int `json:"deleted,omitempty"`
-	Upserted *int `json:"upserted,omitempty"`
+	Deleted  int `json:"deleted"`
+	Upserted int `json:"upserted"`
 }
 
 // Record The object contains information about an index record.
 type Record struct {
 	// Id the record identifier within the index. The value must be unique for the index and it is defined by the format parser.
-	Id *string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Segment contains the searchable text for the record.
-	Segment *string `json:"segment,omitempty"`
+	Segment string `json:"segment"`
 
 	// Vector contains the vector data for the record in the format basis. The format parser defines the basis and the field structure.
-	Vector *openapi_types.File `json:"vector,omitempty"`
+	Vector []byte `json:"vector"`
 }
 
 // RecordsResult defines model for RecordsResult.
 type RecordsResult struct {
-	NextPageId *string   `json:"nextPageId,omitempty"`
-	Records    *[]Record `json:"records,omitempty"`
-	Total      *int      `json:"total,omitempty"`
+	NextPageId *string  `json:"nextPageId,omitempty"`
+	Records    []Record `json:"records"`
+	Total      int      `json:"total"`
 }
 
-// SearchRecordsRecords defines model for SearchRecordsRecords.
-type SearchRecordsRecords struct {
-	Distinct     *bool                   `json:"distinct,omitempty"`
-	IndexIDs     *[]string               `json:"indexIDs,omitempty"`
-	Limit        *int                    `json:"limit,omitempty"`
-	Offset       *int                    `json:"offset,omitempty"`
-	OrderByScore *bool                   `json:"orderByScore,omitempty"`
-	PageId       *string                 `json:"pageId,omitempty"`
-	Tags         *map[string]interface{} `json:"tags,omitempty"`
-	Text         *string                 `json:"text,omitempty"`
+// SearchRecord defines model for SearchRecord.
+type SearchRecord struct {
+	IndexId string `json:"indexId"`
+
+	// IndexRecord The object contains information about an index record.
+	IndexRecord     Record   `json:"indexRecord"`
+	MatchedKeywords []string `json:"matchedKeywords"`
+	Score           int      `json:"score"`
 }
+
+// SearchRequest defines model for SearchRequest.
+type SearchRequest struct {
+	Distinct     bool     `json:"distinct"`
+	IndexIDs     []string `json:"indexIDs"`
+	Limit        int      `json:"limit"`
+	Offset       int      `json:"offset"`
+	OrderByScore bool     `json:"orderByScore"`
+	PageId       string   `json:"pageId"`
+	Tags         Tags     `json:"tags"`
+	Text         string   `json:"text"`
+}
+
+// SearchResult defines model for SearchResult.
+type SearchResult struct {
+	NextPageId *string        `json:"nextPageId,omitempty"`
+	Records    []SearchRecord `json:"records"`
+	Total      int            `json:"total"`
+}
+
+// Tags defines model for Tags.
+type Tags map[string]string
 
 // CreatedAfter defines model for CreatedAfter.
 type CreatedAfter = time.Time
@@ -122,6 +140,9 @@ type CreatedBefore = time.Time
 
 // FormatId defines model for FormatId.
 type FormatId = string
+
+// FormatParam defines model for FormatParam.
+type FormatParam = string
 
 // IndexId defines model for IndexId.
 type IndexId = string
@@ -135,6 +156,9 @@ type PageId = string
 // StartIndexId defines model for StartIndexId.
 type StartIndexId = string
 
+// TagsParam defines model for TagsParam.
+type TagsParam = Tags
+
 // GetIndexesParams defines parameters for GetIndexes.
 type GetIndexesParams struct {
 	// CreatedAfter start of time interval in which items are queried
@@ -145,6 +169,8 @@ type GetIndexesParams struct {
 
 	// StartIndexId The indexId for the first record
 	StartIndexId *StartIndexId `form:"startIndexId,omitempty" json:"startIndexId,omitempty"`
+	Format       *FormatParam  `form:"format,omitempty" json:"format,omitempty"`
+	Tags         *TagsParam    `form:"tags,omitempty" json:"tags,omitempty"`
 
 	// Limit The limit defines the max number of objects returned per page.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -184,7 +210,7 @@ type PutIndexJSONRequestBody = Index
 type PatchIndexRecordsJSONRequestBody = PatchRecordsRequest
 
 // SearchJSONRequestBody defines body for Search for application/json ContentType.
-type SearchJSONRequestBody = SearchRecordsRecords
+type SearchJSONRequestBody = SearchRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -341,6 +367,22 @@ func (siw *ServerInterfaceWrapper) GetIndexes(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "startIndexId", c.Request.URL.Query(), &params.StartIndexId)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter startIndexId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "format" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "format", c.Request.URL.Query(), &params.Format)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter format: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "tags" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "tags", c.Request.URL.Query(), &params.Tags)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter tags: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -585,38 +627,40 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"AP//O/3GeEwlAAA=",
+	"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",
+	"1liDKQAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
