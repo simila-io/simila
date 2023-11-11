@@ -24,8 +24,8 @@ The Simila API is based on the [concepts](docs/concepts.md) and available over [
 ## How to run
 Here are some examples, how Simila can be run:
 
-- [Build and run locally from the source code](docs/deployment.md#compile-from-the-source-code-and-run-it-locally)
 - [Runing localy in docker compose](docs/deployment.md#docker-compose-locally)
+- [Build and run locally from the source code](docs/deployment.md#compile-from-the-source-code-and-run-it-locally)
 
 ## License
 Apache License 2.0, see [LICENSE](LICENSE).

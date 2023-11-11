@@ -62,7 +62,7 @@ func toApiSearchResultItem(mItem persistence.SearchQueryResultItem, includeScore
 	srr := &index.SearchRecordsResultItem{
 		IndexId:         mItem.IndexID,
 		IndexRecord:     toApiRecord(mItem.IndexRecord),
-		MatchedKeywords: mItem.MatchedKeywords,
+		MatchedKeywords: mItem.MatchedKeywordsList,
 	}
 	if includeScore {
 		srr.Score = cast.Ptr(int64(cast.Value(&mItem.Score, 0)))

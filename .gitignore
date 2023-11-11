@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
 build/
+data/
 testdata/
 
 # Binaries for programs and plugins

@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package migrations
+package pgroonga
 
-import migrate "github.com/rubenv/sql-migrate"
+import (
+	"context"
+	"database/sql"
+	migrate "github.com/rubenv/sql-migrate"
+)
 
 const (
 	initUp = `
@@ -89,7 +93,7 @@ create index if not exists "idx_index_record_segment" on "index_record" using pg
 `
 )
 
-func InitTable(id string) *migrate.Migration {
+func initSchema(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
 		Up:   []string{initUp},
@@ -97,7 +101,7 @@ func InitTable(id string) *migrate.Migration {
 	}
 }
 
-func AddTxtFormat(id string) *migrate.Migration {
+func addTxtFormat(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
 		Up:   []string{addTxtFormatUp},
@@ -105,10 +109,48 @@ func AddTxtFormat(id string) *migrate.Migration {
 	}
 }
 
-func UseNgramIndex(id string) *migrate.Migration {
+func useNgramIndex(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
 		Up:   []string{useNgramIndexUp},
 		Down: []string{useNgramIndexDown},
+	}
+}
+
+func migrateUp(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, dummy("0"))
+	migrs = append(migrs, initSchema("1"))
+	migrs = append(migrs, addTxtFormat("2"))
+	migrs = append(migrs, useNgramIndex("3"))
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
+		return err
+	}
+	return nil
+}
+
+func migrateDown(ctx context.Context, db *sql.DB) error {
+	migrs := make([]*migrate.Migration, 0)
+	migrs = append(migrs, dummy("0"))
+	migrs = append(migrs, initSchema("1"))
+	migrs = append(migrs, addTxtFormat("2"))
+	migrs = append(migrs, useNgramIndex("3"))
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	return nil
+}
+
+func dummy(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:   id,
+		Up:   []string{},
+		Down: []string{},
 	}
 }

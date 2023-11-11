@@ -69,10 +69,8 @@ type (
 		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
 
 		// Search performs full text search across existing index records
-		// the query string should be formed in accordance with the groonga manual
-		// for the `&@~` operator, useful links:
-		// - https://pgroonga.github.io/reference/operators/query-v2.html
-		// - https://groonga.org/docs/reference/grn_expr/query_syntax.html
+		// the query string should be formed in accordance with the query
+		// language of the underlying search engine
 		Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error)
 	}
 

@@ -29,11 +29,13 @@ type (
 		GrpcTransport *transport.Config
 		// HttpPort defines the port for listening incoming HTTP connections
 		HttpPort int
-		DB       *DB
+		// SearchEngine specifies which engine is used for search (pgroonga, pgtrigm)
+		SearchEngine string
+		// DB specifies settings for DB used as a full text search engine (e.g. postgres)
+		DB *DB
 	}
 
 	DB struct {
-		// Driver provides the data-source driver name (mysql, postgres etc.)
 		Driver   string
 		Host     string
 		Port     string
@@ -59,6 +61,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		GrpcTransport: transport.GetDefaultGRPCConfig(),
 		HttpPort:      8080,
+		SearchEngine:  "pgroonga",
 		DB: &DB{
 			Driver:   "postgres",
 			Host:     "localhost",
@@ -81,8 +84,8 @@ func BuildConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("could not read data from the file %s: %w", cfgFile, err)
 	}
 	// overwrite default
-	e.ApplyOther(fe)
-	e.ApplyEnvVariables("SIMILA", "_")
+	_ = e.ApplyOther(fe)
+	_ = e.ApplyEnvVariables("SIMILA", "_")
 	cfg := e.Value()
 	return &cfg, nil
 }

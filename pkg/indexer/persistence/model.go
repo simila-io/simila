@@ -19,7 +19,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -82,12 +81,11 @@ type (
 		Limit        int
 	}
 
-	Keywords []string
-
 	SearchQueryResultItem struct {
 		IndexRecord
-		MatchedKeywords Keywords `db:"matched_keywords"`
-		Score           int      `db:"score"`
+		MatchedKeywordsList []string // mapped manually after filling the MatchedKeywords
+		MatchedKeywords     string   `db:"matched_keywords"`
+		Score               int      `db:"score"`
 	}
 
 	QueryResult[T any, N any] struct {
@@ -101,23 +99,6 @@ type (
 		RecordID string `json:"record_id"`
 	}
 )
-
-func (kw *Keywords) Scan(value any) error {
-	s, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("not a string value in scan")
-	}
-	kwArr := strings.Split(s, "<span class=\"keyword\">")
-	if len(kwArr) == 0 {
-		return nil
-	}
-	kwArr = kwArr[1:]
-	for i := 0; i < len(kwArr); i++ {
-		kwArr[i] = strings.Split(kwArr[i], "</span>")[0]
-	}
-	*kw = kwArr
-	return nil
-}
 
 func (id IndexRecordID) Encode() string {
 	if len(id.RecordID) == 0 && len(id.IndexID) == 0 {
