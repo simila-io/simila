@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pgroonga
+package groonga
 
 import (
 	"context"
@@ -256,11 +256,14 @@ func (ts *pgTestSuite) TestSearch() {
 	assert.Equal(ts.T(), int64(3), res3.Total)
 	assert.Equal(ts.T(), 3, len(res3.Items))
 	assert.Equal(ts.T(), "", res3.NextID)
-	assert.Equal(ts.T(), 3, res3.Items[0].Score)
+
+	assert.Greater(ts.T(), res3.Items[0].Score, float32(2.9))
 	assert.Equal(ts.T(), "ping pong pung", res3.Items[0].Segment)
-	assert.Equal(ts.T(), 2, res3.Items[1].Score)
+
+	assert.Greater(ts.T(), res3.Items[1].Score, float32(1.9))
 	assert.Equal(ts.T(), "pong pung", res3.Items[1].Segment)
-	assert.Equal(ts.T(), 1, res3.Items[2].Score)
+
+	assert.Greater(ts.T(), res3.Items[2].Score, float32(0.9))
 	assert.Equal(ts.T(), "pung", res3.Items[2].Segment)
 
 	res4, err := mtx.Search(persistence.SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID},
@@ -269,9 +272,11 @@ func (ts *pgTestSuite) TestSearch() {
 	assert.Equal(ts.T(), int64(3), res4.Total)
 	assert.Equal(ts.T(), 2, len(res4.Items))
 	assert.Equal(ts.T(), "", res4.NextID)
-	assert.Equal(ts.T(), 2, res4.Items[0].Score)
+
+	assert.Greater(ts.T(), res4.Items[0].Score, float32(1.9))
 	assert.Equal(ts.T(), "pong pung", res4.Items[0].Segment)
-	assert.Equal(ts.T(), 1, res4.Items[1].Score)
+
+	assert.Greater(ts.T(), res4.Items[1].Score, float32(0.9))
 	assert.Equal(ts.T(), "pung", res4.Items[1].Segment)
 
 	res5, err := mtx.Search(persistence.SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID},
@@ -281,30 +286,30 @@ func (ts *pgTestSuite) TestSearch() {
 	assert.Equal(ts.T(), 5, len(res5.Items))
 	assert.Equal(ts.T(), "", res5.NextID)
 
-	assert.Equal(ts.T(), 3, res5.Items[0].Score)
+	assert.Greater(ts.T(), res5.Items[0].Score, float32(2.9))
 	assert.Equal(ts.T(), "ha haha", res5.Items[0].Segment)
 	assert.Equal(ts.T(), 1, len(res5.Items[0].MatchedKeywordsList))
 	assert.Equal(ts.T(), "ha", res5.Items[0].MatchedKeywordsList[0])
 
-	assert.Equal(ts.T(), 3, res5.Items[1].Score)
+	assert.Greater(ts.T(), res5.Items[1].Score, float32(2.9))
 	assert.Equal(ts.T(), "ping pong pung", res5.Items[1].Segment)
 	assert.Equal(ts.T(), 3, len(res5.Items[1].MatchedKeywordsList))
 	assert.Equal(ts.T(), "ping", res5.Items[1].MatchedKeywordsList[0])
 	assert.Equal(ts.T(), "pong", res5.Items[1].MatchedKeywordsList[1])
 	assert.Equal(ts.T(), "pung", res5.Items[1].MatchedKeywordsList[2])
 
-	assert.Equal(ts.T(), 2, res5.Items[2].Score)
+	assert.Greater(ts.T(), res5.Items[2].Score, float32(1.9))
 	assert.Equal(ts.T(), "pong pung", res5.Items[2].Segment)
 	assert.Equal(ts.T(), 2, len(res5.Items[2].MatchedKeywordsList))
 	assert.Equal(ts.T(), "pong", res5.Items[2].MatchedKeywordsList[0])
 	assert.Equal(ts.T(), "pung", res5.Items[2].MatchedKeywordsList[1])
 
-	assert.Equal(ts.T(), 1, res5.Items[3].Score)
+	assert.Greater(ts.T(), res5.Items[3].Score, float32(0.9))
 	assert.Equal(ts.T(), "ha no no я Français", res5.Items[3].Segment)
 	assert.Equal(ts.T(), 1, len(res5.Items[3].MatchedKeywordsList))
 	assert.Equal(ts.T(), "ha", res5.Items[3].MatchedKeywordsList[0])
 
-	assert.Equal(ts.T(), 1, res5.Items[4].Score)
+	assert.Greater(ts.T(), res5.Items[4].Score, float32(0.9))
 	assert.Equal(ts.T(), "万事如意 ha", res5.Items[4].Segment)
 	assert.Equal(ts.T(), 1, len(res5.Items[4].MatchedKeywordsList))
 	assert.Equal(ts.T(), "ha", res5.Items[4].MatchedKeywordsList[0])

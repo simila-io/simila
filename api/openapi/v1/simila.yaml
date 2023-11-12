@@ -442,7 +442,8 @@ components:
           items:
             type: string
         score:
-          type: integer
+          type: number
+          format: float
     SearchResult:
       type: object
       required:

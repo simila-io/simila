@@ -4,15 +4,19 @@ import (
 	"fmt"
 	"github.com/logrange/linker"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
-	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgroonga"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/groonga"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/trigram"
 )
 
 const (
-	GroongaExt = "pgroonga"
-	TrigramExt = "pgtrgm"
+	DefaultMode = "pg_default"
+	GroongaMode = "pg_groonga"
+	TrigramMode = "pg_trigram"
 )
 
 type (
+	SearchMode string
+
 	LifecycleDb interface {
 		persistence.Db
 		linker.Initializer
@@ -20,11 +24,15 @@ type (
 	}
 )
 
-func GetDb(dsName, searchExt string) LifecycleDb {
-	switch ext := searchExt; ext {
-	case GroongaExt:
-		return pgroonga.NewDb(dsName)
+func GetDb(dsName string, searchMode SearchMode) LifecycleDb {
+	switch ext := searchMode; ext {
+	case "", DefaultMode:
+		fallthrough // TODO: implement Postgres built-in full-text search
+	case GroongaMode:
+		return groonga.NewDb(dsName)
+	case TrigramMode:
+		return trigram.NewDb(dsName)
 	default:
-		panic(fmt.Sprintf("unsupported postgres extension: %s", ext))
+		panic(fmt.Sprintf("unsupported postgres search mode: %s", ext))
 	}
 }

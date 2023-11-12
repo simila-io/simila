@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pgroonga
+package groonga
 
 import (
 	"context"
@@ -85,11 +85,11 @@ delete from format where id='txt';
 `
 	useNgramIndexUp = `
 drop index if exists "idx_index_record_segment";
-create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment") with (tokenizer='TokenNgram("unify_alphabet", false, "unify_symbol", false, "unify_digit", false)');
+create index "idx_index_record_segment" on "index_record" using pgroonga ("segment") with (tokenizer='TokenNgram("unify_alphabet", false, "unify_symbol", false, "unify_digit", false)');
 `
 	useNgramIndexDown = `
 drop index if exists "idx_index_record_segment";
-create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment");
+create index "idx_index_record_segment" on "index_record" using pgroonga ("segment");
 `
 )
 
@@ -120,9 +120,9 @@ func useNgramIndex(id string) *migrate.Migration {
 func migrateUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, dummy("0"))
-	migrs = append(migrs, initSchema("1"))
-	migrs = append(migrs, addTxtFormat("2"))
-	migrs = append(migrs, useNgramIndex("3"))
+	migrs = append(migrs, initSchema("1699744510"))
+	migrs = append(migrs, addTxtFormat("1699744511"))
+	migrs = append(migrs, useNgramIndex("1699744512"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -135,9 +135,9 @@ func migrateUp(ctx context.Context, db *sql.DB) error {
 func migrateDown(ctx context.Context, db *sql.DB) error {
 	migrs := make([]*migrate.Migration, 0)
 	migrs = append(migrs, dummy("0"))
-	migrs = append(migrs, initSchema("1"))
-	migrs = append(migrs, addTxtFormat("2"))
-	migrs = append(migrs, useNgramIndex("3"))
+	migrs = append(migrs, initSchema("1699744510"))
+	migrs = append(migrs, addTxtFormat("1699744511"))
+	migrs = append(migrs, useNgramIndex("1699744512"))
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}

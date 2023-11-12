@@ -65,7 +65,7 @@ func toApiSearchResultItem(mItem persistence.SearchQueryResultItem, includeScore
 		MatchedKeywords: mItem.MatchedKeywordsList,
 	}
 	if includeScore {
-		srr.Score = cast.Ptr(int64(cast.Value(&mItem.Score, 0)))
+		srr.Score = &mItem.Score
 	}
 	return srr
 }
@@ -149,7 +149,7 @@ func searchRecordsResultItems2Rest(srr *index.SearchRecordsResultItem) similapi.
 	return similapi.SearchRecord{
 		IndexRecord:     record2Rest(srr.IndexRecord),
 		IndexId:         srr.IndexId,
-		Score:           int(cast.Value(srr.Score, -1)),
+		Score:           cast.Value(srr.Score, -1.0),
 		MatchedKeywords: srr.MatchedKeywords,
 	}
 }
@@ -159,7 +159,7 @@ func searchRecordsResult2Rest(srr *index.SearchRecordsResult) similapi.SearchRes
 	if srr == nil {
 		return res
 	}
-	res.Records = make([]similapi.SearchRecord, len(res.Records))
+	res.Records = make([]similapi.SearchRecord, len(srr.Items))
 	for i, sr := range srr.Items {
 		res.Records[i] = searchRecordsResultItems2Rest(sr)
 	}

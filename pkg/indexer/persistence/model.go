@@ -85,7 +85,7 @@ type (
 		IndexRecord
 		MatchedKeywordsList []string // mapped manually after filling the MatchedKeywords
 		MatchedKeywords     string   `db:"matched_keywords"`
-		Score               int      `db:"score"`
+		Score               float32  `db:"score"`
 	}
 
 	QueryResult[T any, N any] struct {

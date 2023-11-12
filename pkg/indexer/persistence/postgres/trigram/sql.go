@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pgroonga
+package trigram
 
 import (
 	"context"
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
-	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"os"
@@ -70,6 +69,9 @@ func (d *Db) Init(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not connect to the database: %w", err)
 	}
+	if err = setSessionParams(ctx, sdb); err != nil {
+		return fmt.Errorf("could not set database session params: %w", err)
+	}
 	d.logger.Infof("Migrating...")
 	if err = migrateUp(ctx, sdb.DB); err != nil {
 		return fmt.Errorf("migration failed: %w", err)
@@ -99,6 +101,15 @@ func (d *Db) NewModelTx(ctx context.Context) persistence.ModelTx {
 // NewTx returns the new Tx object
 func (d *Db) NewTx(ctx context.Context) persistence.Tx {
 	return &tx{ctx: ctx, db: d.db}
+}
+
+// Better to set these parameters via migration for the whole DB or system,
+// but unfortunately controlled environments like AWS won't allow to do that.
+func setSessionParams(ctx context.Context, db *sqlx.DB) error {
+	if _, err := db.ExecContext(ctx, "set pg_trgm.word_similarity_threshold = 0.3;"); err != nil {
+		return fmt.Errorf("failed to set 'pg_trgm.word_similarity_threshold': %w", err)
+	}
+	return nil
 }
 
 // ============================== tx ====================================
@@ -626,7 +637,7 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.QueryResult
 		if len(args) > 0 {
 			sb.WriteString(" and ")
 		}
-		sb.WriteString(" index_record.segment &@~ ? ")
+		sb.WriteString(" index_record.segment %> ? ")
 		args = append(args, query.Query)
 	}
 
@@ -654,9 +665,10 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.QueryResult
 	}
 
 	// count
+	args = append(args, query.Query)
 	total, err := m.getCount(fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s)", distinct, where, orderBy), args...)
+		"from (select %s index_record.*, 1.0 - (segment <->> $%d) as score from index_record "+
+		"inner join index on index.id = index_record.index_id %s %s)", distinct, len(args), where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
@@ -666,17 +678,17 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.QueryResult
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Total: total}, nil
 	}
 
-	args = append(args, query.Query, query.Offset, limit)
+	args = append(args, query.Offset, limit)
 	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, "+
-		"pgroonga_highlight_html (index_record.segment, pgroonga_query_extract_keywords($%d)) as matched_keywords, "+
-		"pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d", distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
+		"1 - (segment <->> $%d) as score from index_record "+
+		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
+		distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
 
 	// results
-	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywords)
+	res, err := persistence.ScanRowsQueryResult[persistence.SearchQueryResultItem](rows)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
@@ -701,18 +713,4 @@ func (m *modelTx) getCount(query string, params ...any) (int64, error) {
 		_ = rows.Scan(&count)
 	}
 	return count, nil
-}
-
-func mapKeywords(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
-	kwArr := strings.Split(item.MatchedKeywords, "<span class=\"keyword\">")
-	if len(kwArr) == 0 {
-		return item
-	}
-	kwArr = kwArr[1:]
-	for i := 0; i < len(kwArr); i++ {
-		kwArr[i] = strings.Split(kwArr[i], "</span>")[0]
-	}
-	item.MatchedKeywordsList = strutil.RemoveDups(kwArr)
-	return item
-
 }

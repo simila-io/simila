@@ -1,4 +1,4 @@
-package pgroonga
+package groonga
 
 import (
 	"context"

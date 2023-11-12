@@ -264,7 +264,7 @@ func (c cmdSearch) printAsTable(srr *index.SearchRecordsResult) {
 
 	for _, r := range srr.Items {
 		tbl.AddRow(
-			cutStr(fmt.Sprintf("%d", cast.Int64(r.Score, -1)), 5),
+			cutStr(fmt.Sprintf("%.4f", cast.Value(r.Score, -1.0)), 5),
 			cutStr(r.IndexId, 16),
 			cutStr(fmt.Sprintf("%v", r.MatchedKeywords), 40),
 			cutToKeyword(r.IndexRecord.Segment, r.MatchedKeywords[0], 80),

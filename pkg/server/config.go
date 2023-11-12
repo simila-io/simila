@@ -20,6 +20,7 @@ import (
 	"github.com/acquirecloud/golibs/config"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/acquirecloud/golibs/transport"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres"
 )
 
 type (
@@ -29,7 +30,7 @@ type (
 		GrpcTransport *transport.Config
 		// HttpPort defines the port for listening incoming HTTP connections
 		HttpPort int
-		// SearchEngine specifies which engine is used for search (pgroonga, pgtrigm)
+		// SearchEngine specifies which engine is used for search
 		SearchEngine string
 		// DB specifies settings for DB used as a full text search engine (e.g. postgres)
 		DB *DB
@@ -61,7 +62,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		GrpcTransport: transport.GetDefaultGRPCConfig(),
 		HttpPort:      8080,
-		SearchEngine:  "pgroonga",
+		SearchEngine:  postgres.DefaultMode,
 		DB: &DB{
 			Driver:   "postgres",
 			Host:     "localhost",

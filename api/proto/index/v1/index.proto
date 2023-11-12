@@ -162,7 +162,7 @@ message SearchRecordsResultItem {
   string indexId = 1;
   Record indexRecord = 2;
   repeated string MatchedKeywords = 3;
-  optional int64 score = 4;
+  optional float score = 4;
 }
 
 // SearchRecordsResult contains the result of a search operation
