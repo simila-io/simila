@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package groonga
+package postgres
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/acquirecloud/golibs/errors"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/stretchr/testify/assert"
@@ -29,73 +27,34 @@ import (
 )
 
 type (
-	pgTestSuite struct {
-		suite.Suite
-		cDb persistence.ContainerDb
-		db  *Db
+	pgSharedTestSuite struct {
+		pgTestSuite
+	}
+
+	pgGroongaTestSuite struct {
+		pgTestSuite
+	}
+
+	pgTrgmTestSuite struct {
+		pgTestSuite
 	}
 )
 
-func TestRunSuite(t *testing.T) {
-	c, err := persistence.NewPgContainerDb("groonga/pgroonga:latest-debian-16", persistence.WithDbName("simila_test"))
-	assert.Nil(t, err)
-	//c, err := persistence.NewNilContainerDb(persistence.WithDbName("simila_test"))
-	//assert.Nil(t, err)
-	suite.Run(t, newPqTestSuite(c))
+func TestRunSharedTestSuite(t *testing.T) {
+	suite.Run(t, &pgSharedTestSuite{newPqTestSuite(SearchModuleNone)})
 }
 
-func newPqTestSuite(cDb persistence.ContainerDb) *pgTestSuite {
-	return &pgTestSuite{cDb: cDb}
+func TestRunGroongaTestSuite(t *testing.T) {
+	suite.Run(t, &pgGroongaTestSuite{newPqTestSuite(SearchModuleGroonga)})
 }
 
-func (ts *pgTestSuite) SetupSuite() {
+func TestRunTrgmTestSuite(t *testing.T) {
+	suite.Run(t, &pgTrgmTestSuite{newPqTestSuite(SearchModuleTrgm)})
 }
 
-func (ts *pgTestSuite) TearDownSuite() {
-	if ts.db != nil {
-		ts.db.Shutdown()
-	}
-	if ts.cDb != nil {
-		_ = ts.cDb.Close()
-	}
-}
+// shared
 
-func (ts *pgTestSuite) BeforeTest(suiteName, testName string) {
-	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelFn()
-
-	dbCfg := ts.cDb.DbConfig()
-	assert.Nil(ts.T(), ts.dropCreatePgDb(ctx))
-
-	ts.db = NewDb(dbCfg.DataSourceFull())
-	assert.Nil(ts.T(), ts.db.Init(ctx))
-}
-
-func (ts *pgTestSuite) AfterTest(suiteName, testName string) {
-	if ts.db != nil {
-		ts.db.Shutdown()
-	}
-}
-
-func (ts *pgTestSuite) dropCreatePgDb(ctx context.Context) error {
-	dbCfg := ts.cDb.DbConfig()
-	dbConn, err := sqlx.ConnectContext(ctx, "postgres", dbCfg.DataSourceNoDb())
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = dbConn.Close()
-	}()
-	if _, err = dbConn.DB.Exec(fmt.Sprintf("drop database if exists %s with (force)", dbCfg.DbName)); err != nil {
-		return err
-	}
-	if _, err = dbConn.DB.Exec(fmt.Sprintf("create database %s", dbCfg.DbName)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (ts *pgTestSuite) TestFormat() {
+func (ts *pgSharedTestSuite) TestFormat() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	fmts, err := mtx.ListFormats()
@@ -129,7 +88,7 @@ func (ts *pgTestSuite) TestFormat() {
 	assert.ErrorIs(ts.T(), err, errors.ErrNotExist)
 }
 
-func (ts *pgTestSuite) TestIndex() {
+func (ts *pgSharedTestSuite) TestIndex() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
@@ -164,7 +123,7 @@ func (ts *pgTestSuite) TestIndex() {
 	assert.ErrorIs(ts.T(), err, errors.ErrNotExist)
 }
 
-func (ts *pgTestSuite) TestIndexRecord() {
+func (ts *pgSharedTestSuite) TestIndexRecord() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
@@ -209,7 +168,24 @@ func (ts *pgTestSuite) TestIndexRecord() {
 	assert.Equal(ts.T(), 0, n)
 }
 
-func (ts *pgTestSuite) TestSearch() {
+func (ts *pgSharedTestSuite) TestConstraints() {
+	mtx := ts.db.NewModelTx(context.Background())
+
+	bas, err := json.Marshal([]map[string]any{})
+	assert.Nil(ts.T(), err)
+
+	_, err = mtx.CreateFormat(persistence.Format{ID: "pdf", Basis: bas})
+	assert.Nil(ts.T(), err)
+	_, err = mtx.CreateIndex(persistence.Index{ID: "abc.txt", Format: "pdf", Tags: persistence.Tags{"key": "val"}})
+	assert.Nil(ts.T(), err)
+
+	err = mtx.DeleteFormat("pdf")
+	assert.ErrorIs(ts.T(), err, errors.ErrConflict)
+}
+
+// pgroonga
+
+func (ts *pgGroongaTestSuite) TestSearch() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
@@ -315,17 +291,71 @@ func (ts *pgTestSuite) TestSearch() {
 	assert.Equal(ts.T(), "ha", res5.Items[4].MatchedKeywordsList[0])
 }
 
-func (ts *pgTestSuite) TestConstraints() {
+// pgtrgm
+
+func (ts *pgTrgmTestSuite) TestSearch() {
 	mtx := ts.db.NewModelTx(context.Background())
 
-	bas, err := json.Marshal([]map[string]any{})
+	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
+	assert.Nil(ts.T(), err)
+	vec, err := json.Marshal([]any{7, "word"})
 	assert.Nil(ts.T(), err)
 
 	_, err = mtx.CreateFormat(persistence.Format{ID: "pdf", Basis: bas})
 	assert.Nil(ts.T(), err)
-	_, err = mtx.CreateIndex(persistence.Index{ID: "abc.txt", Format: "pdf", Tags: persistence.Tags{"key": "val"}})
+	_, err = mtx.CreateFormat(persistence.Format{ID: "doc", Basis: bas})
+	assert.Nil(ts.T(), err)
+	idx1, err := mtx.CreateIndex(persistence.Index{ID: "abc.txt", Format: "pdf", Tags: persistence.Tags{"key": "val"}})
+	assert.Nil(ts.T(), err)
+	idx2, err := mtx.CreateIndex(persistence.Index{ID: "def.txt", Format: "doc", Tags: persistence.Tags{"org": "123"}})
 	assert.Nil(ts.T(), err)
 
-	err = mtx.DeleteFormat("pdf")
-	assert.ErrorIs(ts.T(), err, errors.ErrConflict)
+	err = mtx.UpsertIndexRecords(
+		persistence.IndexRecord{ID: "123", IndexID: idx1.ID, Segment: "ha haha", Vector: vec},
+		persistence.IndexRecord{ID: "456", IndexID: idx1.ID, Segment: "hello world", Vector: vec},
+		persistence.IndexRecord{ID: "789", IndexID: idx1.ID, Segment: "ha no no я Français", Vector: vec},
+		persistence.IndexRecord{ID: "101", IndexID: idx2.ID, Segment: "万事如意 ha ho", Vector: vec},
+		persistence.IndexRecord{ID: "111", IndexID: idx2.ID, Segment: "ping pong pung", Vector: vec},
+		persistence.IndexRecord{ID: "121", IndexID: idx2.ID, Segment: "pong pung", Vector: vec},
+		persistence.IndexRecord{ID: "131", IndexID: idx2.ID, Segment: "pung", Vector: vec})
+	assert.Nil(ts.T(), err)
+
+	res1, err := mtx.Search(persistence.SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID},
+		Query: "HELLO world Français", Limit: 10})
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(2), res1.Total)
+	assert.Equal(ts.T(), 2, len(res1.Items))
+	assert.Equal(ts.T(), "", res1.NextID)
+
+	assert.Greater(ts.T(), res1.Items[0].Score, float32(0.5))
+	assert.Equal(ts.T(), "hello world", res1.Items[0].Segment)
+
+	assert.Greater(ts.T(), res1.Items[1].Score, float32(0.4))
+	assert.Equal(ts.T(), "ha no no я Français", res1.Items[1].Segment)
+
+	res2, err := mtx.Search(persistence.SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID},
+		Query: "万事如", Limit: 10})
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(1), res2.Total)
+	assert.Equal(ts.T(), 1, len(res2.Items))
+	assert.Equal(ts.T(), "", res2.NextID)
+
+	assert.Greater(ts.T(), res2.Items[0].Score, float32(0.7))
+	assert.Equal(ts.T(), "万事如意 ha ho", res2.Items[0].Segment)
+
+	res3, err := mtx.Search(persistence.SearchQuery{IndexIDs: []string{idx1.ID, idx2.ID},
+		Query: "ping pong pung", OrderByScore: true, Limit: 10})
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(3), res3.Total)
+	assert.Equal(ts.T(), 3, len(res3.Items))
+	assert.Equal(ts.T(), "", res3.NextID)
+
+	assert.Greater(ts.T(), res3.Items[0].Score, float32(0.9))
+	assert.Equal(ts.T(), "ping pong pung", res3.Items[0].Segment)
+
+	assert.Greater(ts.T(), res3.Items[1].Score, float32(0.7))
+	assert.Equal(ts.T(), "pong pung", res3.Items[1].Segment)
+
+	assert.Greater(ts.T(), res3.Items[2].Score, float32(0.4))
+	assert.Equal(ts.T(), "pung", res3.Items[2].Segment)
 }

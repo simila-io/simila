@@ -55,7 +55,7 @@ func Run(ctx context.Context, cfg *Config) error {
 	rst := api.NewRest(gsvc)
 
 	// DB
-	db := postgres.GetDb(cfg.DB.SourceName(), postgres.SearchMode(cfg.SearchEngine))
+	db := postgres.MustGetDb(ctx, cfg.DB.SourceName(), postgres.SearchModuleName(cfg.SearchEngine))
 
 	inj := linker.New()
 	inj.Register(linker.Component{Name: "", Value: db})

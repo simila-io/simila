@@ -68,7 +68,7 @@ type (
 		// QueryIndexRecords lists query matching index record entries
 		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
 
-		// Search performs full text search across existing index records
+		// Search performs search across existing index records
 		// the query string should be formed in accordance with the query
 		// language of the underlying search engine
 		Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error)

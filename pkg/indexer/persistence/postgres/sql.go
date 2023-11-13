@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package trigram
+package postgres
 
 import (
 	"context"
@@ -28,11 +28,16 @@ import (
 )
 
 type (
+	// Db implements persistence.Db
 	Db struct {
-		dsName string // data source name "user=foo dbname=bar sslmode=disable"
-		logger logging.Logger
-		db     *sqlx.DB
+		logger   logging.Logger
+		searchFn SearchFn
+		db       *sqlx.DB
 	}
+
+	// SearchFn is used to provide different search implementations
+	SearchFn func(ctx context.Context, q sqlx.QueryerContext,
+		query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error)
 
 	// exec is a helper interface to provide joined functionality of sqlx.DB and sqlx.Tx
 	// it is used by the tx.executor()
@@ -53,30 +58,18 @@ type (
 
 	// modelTx is a helper to persist persistence objects ModelTx
 	modelTx struct {
-		*tx // the active transaction, never nil for the object
+		searchFn SearchFn
+		*tx      // the active transaction, never nil for the object
 	}
 )
 
-// NewDb creates new db object
-func NewDb(dsName string) *Db {
-	return &Db{dsName: dsName, logger: logging.NewLogger("db.postgres")}
+func newDb(sdb *sqlx.DB, searchFn SearchFn) *Db {
+	return &Db{db: sdb, searchFn: searchFn, logger: logging.NewLogger("db.postgres")}
 }
 
 // Init implements linker.Initializer interface
 func (d *Db) Init(ctx context.Context) error {
 	d.logger.Infof("Initializing...")
-	sdb, err := sqlx.ConnectContext(ctx, "postgres", d.dsName)
-	if err != nil {
-		return fmt.Errorf("could not connect to the database: %w", err)
-	}
-	if err = setSessionParams(ctx, sdb); err != nil {
-		return fmt.Errorf("could not set database session params: %w", err)
-	}
-	d.logger.Infof("Migrating...")
-	if err = migrateUp(ctx, sdb.DB); err != nil {
-		return fmt.Errorf("migration failed: %w", err)
-	}
-	d.db = sdb
 	return nil
 }
 
@@ -95,21 +88,12 @@ func (d *Db) Shutdown() {
 
 // NewModelTx returns the new ModelTx object
 func (d *Db) NewModelTx(ctx context.Context) persistence.ModelTx {
-	return &modelTx{tx: d.NewTx(ctx).(*tx)}
+	return &modelTx{tx: d.NewTx(ctx).(*tx), searchFn: d.searchFn}
 }
 
 // NewTx returns the new Tx object
 func (d *Db) NewTx(ctx context.Context) persistence.Tx {
 	return &tx{ctx: ctx, db: d.db}
-}
-
-// Better to set these parameters via migration for the whole DB or system,
-// but unfortunately controlled environments like AWS won't allow to do that.
-func setSessionParams(ctx context.Context, db *sqlx.DB) error {
-	if _, err := db.ExecContext(ctx, "set pg_trgm.word_similarity_threshold = 0.3;"); err != nil {
-		return fmt.Errorf("failed to set 'pg_trgm.word_similarity_threshold': %w", err)
-	}
-	return nil
 }
 
 // ============================== tx ====================================
@@ -344,7 +328,7 @@ func (m *modelTx) QueryIndexes(query persistence.IndexQuery) (persistence.QueryR
 	}
 
 	// count
-	total, err := m.getCount(fmt.Sprintf("select count(*) from index %s", where), args...)
+	total, err := persistence.Count(m.ctx, m.executor(), fmt.Sprintf("select count(*) from index %s", where), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.Index, string]{}, persistence.MapError(err)
 	}
@@ -555,7 +539,7 @@ func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persist
 	}
 
 	// count
-	total, err := m.getCount(fmt.Sprintf("select count(*) from index_record %s ", where), args...)
+	total, err := persistence.Count(m.ctx, m.executor(), fmt.Sprintf("select count(*) from index_record %s ", where), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.IndexRecord, string]{}, persistence.MapError(err)
 	}
@@ -584,133 +568,8 @@ func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persist
 }
 
 func (m *modelTx) Search(query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
-	if len(query.Query) == 0 {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
+	if m.searchFn != nil {
+		return m.searchFn(m.ctx, m.executor(), query)
 	}
-	sb := strings.Builder{}
-	args := make([]any, 0)
-
-	if len(query.FromID) > 0 {
-		var fromID persistence.IndexRecordID
-		if err := fromID.Decode(query.FromID); err != nil {
-			return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("invalid FromID: %w", errors.ErrInvalid)
-		}
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" index_record.index_id >= ? and index_record.id >= ? ")
-		args = append(args, fromID.IndexID, fromID.RecordID)
-	}
-	if len(query.IndexIDs) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		oldLen := len(args)
-		sb.WriteString(" index_record.index_id in ( ")
-		for _, id := range query.IndexIDs {
-			if len(args) > oldLen {
-				sb.WriteString(", ")
-			}
-			sb.WriteString("?")
-			args = append(args, id)
-		}
-		sb.WriteString(")")
-	}
-	if len(query.Tags) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		var tb strings.Builder
-		tb.WriteString(" {")
-		oldLen := tb.Len()
-		for k, v := range query.Tags {
-			if tb.Len() > oldLen {
-				tb.WriteByte(',')
-			}
-			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
-		}
-		tb.WriteString("}")
-		sb.WriteString(" index.tags @> ?")
-		args = append(args, tb.String())
-	}
-	if len(query.Query) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" index_record.segment %> ? ")
-		args = append(args, query.Query)
-	}
-
-	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	if len(where) > 0 {
-		where = " where " + where
-	}
-
-	distinct := ""
-	if query.Distinct {
-		if query.OrderByScore {
-			distinct = "distinct on(score, index_record.index_id)"
-		} else {
-			distinct = "distinct on(index_record.index_id)"
-		}
-	}
-
-	orderBy, limit := "", 0
-	if query.OrderByScore {
-		orderBy = "order by score desc, index_record.index_id asc, index_record.id asc"
-		limit = query.Limit // no +1, since no pagination
-	} else {
-		orderBy = "order by index_record.index_id asc, index_record.id asc"
-		limit = query.Limit + 1
-	}
-
-	// count
-	args = append(args, query.Query)
-	total, err := m.getCount(fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, 1.0 - (segment <->> $%d) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s)", distinct, len(args), where, orderBy), args...)
-	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
-	}
-
-	// query
-	if query.Limit <= 0 {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Total: total}, nil
-	}
-
-	args = append(args, query.Offset, limit)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select %s index_record.*, "+
-		"1 - (segment <->> $%d) as score from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
-		distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
-	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
-	}
-
-	// results
-	res, err := persistence.ScanRowsQueryResult[persistence.SearchQueryResultItem](rows)
-	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
-	}
-	var nextID persistence.IndexRecordID
-	if len(res) > query.Limit {
-		nextID = persistence.IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
-		res = res[:query.Limit]
-	}
-	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
-}
-
-func (m *modelTx) getCount(query string, params ...any) (int64, error) {
-	rows, err := m.executor().QueryContext(m.ctx, query, params...)
-	if err != nil {
-		return -1, persistence.MapError(err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-	var count int64
-	if rows.Next() {
-		_ = rows.Scan(&count)
-	}
-	return count, nil
+	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, errors.ErrUnimplemented
 }

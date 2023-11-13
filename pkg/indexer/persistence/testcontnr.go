@@ -23,12 +23,12 @@ type (
 		SslMode  string
 	}
 
-	ContainerDb interface {
+	DbContainer interface {
 		io.Closer
 		DbConfig() DbConfig
 	}
 
-	containerDb struct {
+	dbContainer struct {
 		c     testcontainers.Container
 		dbCfg DbConfig
 	}
@@ -61,7 +61,7 @@ func (ds DbConfig) DataSourceFull() string {
 	return fmt.Sprintf("%s dbname=%s", ds.DataSourceNoDb(), ds.DbName)
 }
 
-func NewNilContainerDb(opts ...DbOption) (ContainerDb, error) {
+func NewNilDbContainer(opts ...DbOption) (DbContainer, error) {
 	dbCfg := DbConfig{
 		Host:     "127.0.0.1",
 		Port:     "5432",
@@ -72,27 +72,24 @@ func NewNilContainerDb(opts ...DbOption) (ContainerDb, error) {
 	for _, opt := range opts {
 		opt(&dbCfg)
 	}
-	return &containerDb{dbCfg: dbCfg}, nil
+	return &dbContainer{dbCfg: dbCfg}, nil
 }
 
-func (cd containerDb) Close() error {
-	if cd.c == nil {
+func (dc dbContainer) Close() error {
+	if dc.c == nil {
 		return nil
 	}
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFn()
-	return cd.c.Terminate(ctx)
+	return dc.c.Terminate(ctx)
 }
 
-func (cd containerDb) DbConfig() DbConfig {
-	return cd.dbCfg
+func (dc dbContainer) DbConfig() DbConfig {
+	return dc.dbCfg
 }
 
-// NewPgContainerDb runs pg database in a docker container.
-func NewPgContainerDb(image string, opts ...DbOption) (ContainerDb, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
+// NewPgDbContainer runs pg database in a docker container.
+func NewPgDbContainer(ctx context.Context, image string, opts ...DbOption) (DbContainer, error) {
 	dbCfg := DbConfig{
 		Host:     "127.0.0.1",
 		Port:     "5432",
@@ -130,5 +127,5 @@ func NewPgContainerDb(image string, opts ...DbOption) (ContainerDb, error) {
 		return nil, err
 	}
 	dbCfg.Port = mappedPort.Port()
-	return &containerDb{c: c, dbCfg: dbCfg}, nil
+	return &dbContainer{c: c, dbCfg: dbCfg}, nil
 }

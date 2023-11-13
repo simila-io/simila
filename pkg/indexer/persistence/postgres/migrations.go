@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package groonga
+package postgres
 
 import (
 	"context"
 	"database/sql"
 	migrate "github.com/rubenv/sql-migrate"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgroonga"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgtrgm"
 )
 
 const (
-	initUp = `
+	initSchemaUp = `
 drop table if exists "index_record";
 drop table if exists "index";
 drop table if exists "format";
-drop extension if exists pgroonga;
-
-create extension pgroonga;
 
 create table if not exists "format"
 (
@@ -64,17 +63,13 @@ create table if not exists "index_record"
     primary key ("index_id", "id")
 );
 
-create index if not exists "idx_index_record_segment" on "index_record" using pgroonga ("segment");
 create index if not exists "idx_index_record_vector" on "index_record" using gin ("vector");
 create index if not exists "idx_index_record_created_at" on "index_record" ("created_at");
 `
-
-	initDown = `
+	initSchemaDown = `
 drop table if exists "index_record";
 drop table if exists "index";
 drop table if exists "format";
-
-drop extension if exists pgroonga;
 `
 
 	addTxtFormatUp = `
@@ -83,21 +78,20 @@ insert into format (id) values('txt') on conflict do nothing;
 	addTxtFormatDown = `
 delete from format where id='txt';
 `
-	useNgramIndexUp = `
-drop index if exists "idx_index_record_segment";
-create index "idx_index_record_segment" on "index_record" using pgroonga ("segment") with (tokenizer='TokenNgram("unify_alphabet", false, "unify_symbol", false, "unify_digit", false)');
-`
-	useNgramIndexDown = `
-drop index if exists "idx_index_record_segment";
-create index "idx_index_record_segment" on "index_record" using pgroonga ("segment");
-`
 )
+
+func init() {
+	// ignore unknown migrations, this allows to switch
+	// between migrations of different search implementations
+	// without the need of "tweaking" the DB
+	migrate.SetIgnoreUnknown(true)
+}
 
 func initSchema(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
-		Up:   []string{initUp},
-		Down: []string{initDown},
+		Up:   []string{initSchemaUp},
+		Down: []string{initSchemaDown},
 	}
 }
 
@@ -109,20 +103,38 @@ func addTxtFormat(id string) *migrate.Migration {
 	}
 }
 
-func useNgramIndex(id string) *migrate.Migration {
-	return &migrate.Migration{
-		Id:   id,
-		Up:   []string{useNgramIndexUp},
-		Down: []string{useNgramIndexDown},
+// sharedMigrations returns migrations to be reused for
+// all the specific search implementations, the range of
+// "shared migrations" IDs [0xxxxx ... 09xxxx]
+func sharedMigrations() []*migrate.Migration {
+	return []*migrate.Migration{
+		initSchema("000001"),
+		addTxtFormat("000002"),
 	}
 }
 
-func migrateUp(ctx context.Context, db *sql.DB) error {
+func migrateUpShared(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
+		return err
+	}
+	return nil
+}
+
+func migrateDownShared(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	return nil
+}
+
+// pgroonga
+
+func migrateUpSharedAndPgGroonga(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
-	migrs = append(migrs, dummy("0"))
-	migrs = append(migrs, initSchema("1699744510"))
-	migrs = append(migrs, addTxtFormat("1699744511"))
-	migrs = append(migrs, useNgramIndex("1699744512"))
+	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, pgroonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -132,12 +144,10 @@ func migrateUp(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func migrateDown(ctx context.Context, db *sql.DB) error {
-	migrs := make([]*migrate.Migration, 0)
-	migrs = append(migrs, dummy("0"))
-	migrs = append(migrs, initSchema("1699744510"))
-	migrs = append(migrs, addTxtFormat("1699744511"))
-	migrs = append(migrs, useNgramIndex("1699744512"))
+func migrateDownSharedAndPgGroonga(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, pgroonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -147,10 +157,48 @@ func migrateDown(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func dummy(id string) *migrate.Migration {
-	return &migrate.Migration{
-		Id:   id,
-		Up:   []string{},
-		Down: []string{},
+func migrateDownPgGroonga(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: pgroonga.Migrations()}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
 	}
+	return nil
+}
+
+// pgtrgm
+
+func migrateUpSharedAndPgTrgm(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, pgtrgm.Migrations()...)
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func migrateDownSharedAndPgTrgm(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, pgtrgm.Migrations()...)
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func migrateDownPgTrgm(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: pgtrgm.Migrations()}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	return nil
 }

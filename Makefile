@@ -107,7 +107,7 @@ compose-up: docker-build ## run the docker compose
 
 .PHONY: compose-down
 compose-down:  ## stop the docker compose
-	docker-compose -f docker-compose.yaml down --volumes --remove-orphans
+	docker-compose -f docker-compose.yaml down --remove-orphans
 
 .PHONY: compose-logs
 compose-logs:  ## show the docker compose logs
