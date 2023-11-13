@@ -7,24 +7,24 @@ import (
 	"time"
 )
 
-func (ts *pgSharedTestSuite) TestMigrations() {
+func (ts *pgCommonTestSuite) TestMigrations() {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFn()
 
 	// down
-	assert.NoError(ts.T(), migrateSharedDown(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateCommonDown(ctx, ts.db.db.DB))
 	count, err := persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)
 
 	// up
-	assert.NoError(ts.T(), migrateSharedUp(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateCommonUp(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(2), count)
 
 	// down
-	assert.NoError(ts.T(), migrateSharedDown(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateCommonDown(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)

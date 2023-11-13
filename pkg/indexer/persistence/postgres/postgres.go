@@ -45,7 +45,7 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 }
 
 func getDefaultDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migrateSharedUp(ctx, db.DB); err != nil {
+	if err := migrateCommonUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 	return newDb(db, nil), nil

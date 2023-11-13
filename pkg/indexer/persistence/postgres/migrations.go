@@ -96,26 +96,26 @@ func addTxtFormat(id string) *migrate.Migration {
 	}
 }
 
-// sharedMigrations returns migrations to be reused for
+// migrations returns migrations to be reused for
 // all the specific search implementations, the range of
-// "shared" migrations IDs [0xxxxx ... 09xxxx]
-func sharedMigrations() []*migrate.Migration {
+// "common" migrations IDs [0-999]
+func migrations() []*migrate.Migration {
 	return []*migrate.Migration{
-		initSchema("000001"),
-		addTxtFormat("000002"),
+		initSchema("0"),
+		addTxtFormat("1"),
 	}
 }
 
-func migrateSharedUp(ctx context.Context, db *sql.DB) error {
-	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
+func migrateCommonUp(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: migrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
 		return err
 	}
 	return nil
 }
 
-func migrateSharedDown(ctx context.Context, db *sql.DB) error {
-	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
+func migrateCommonDown(ctx context.Context, db *sql.DB) error {
+	mms := migrate.MemoryMigrationSource{Migrations: migrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func migrateSharedDown(ctx context.Context, db *sql.DB) error {
 
 func migrateGroongaUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
-	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, migrations()...)
 	migrs = append(migrs, groonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
@@ -139,7 +139,7 @@ func migrateGroongaUp(ctx context.Context, db *sql.DB) error {
 
 func migrateGroongaDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
-	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, migrations()...)
 	migrs = append(migrs, groonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
@@ -154,7 +154,7 @@ func migrateGroongaDown(ctx context.Context, db *sql.DB) error {
 
 func migrateTrigramUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
-	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, migrations()...)
 	migrs = append(migrs, trigram.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
@@ -168,7 +168,7 @@ func migrateTrigramUp(ctx context.Context, db *sql.DB) error {
 
 func migrateTrigramDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
-	migrs = append(migrs, sharedMigrations()...)
+	migrs = append(migrs, migrations()...)
 	migrs = append(migrs, trigram.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,

@@ -39,12 +39,12 @@ func createSegmentIndex(id string) *migrate.Migration {
 }
 
 // Migrations returns migrations to be applied on top of
-// the "shared" migrations for the "groonga" search module to work,
-// the "groonga" module migration IDs range is [1xxxxx ... 19xxxx]
+// the "common" migrations for the "groonga" search module to work,
+// the "groonga" module migration IDs range is [1000-1999]
 func Migrations() []*migrate.Migration {
 	return []*migrate.Migration{
-		createExtension("100001"),
-		createSegmentIndex("100002"),
+		createExtension("1000"),
+		createSegmentIndex("1001"),
 	}
 }
 

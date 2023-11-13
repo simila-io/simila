@@ -39,12 +39,12 @@ func createSegmentIndex(id string) *migrate.Migration {
 }
 
 // Migrations returns migrations to be applied on top of
-// the "shared" migrations for the "trigram" search module to work,
-// the "trigram" module migration IDs range is [2xxxxx ... 29xxxx]
+// the "common" migrations for the "trigram" search module to work,
+// the "trigram" module migration IDs range is [2000-2999]
 func Migrations() []*migrate.Migration {
 	return []*migrate.Migration{
-		createExtension("200001"),
-		createSegmentIndex("200002"),
+		createExtension("2000"),
+		createSegmentIndex("2001"),
 	}
 }
 

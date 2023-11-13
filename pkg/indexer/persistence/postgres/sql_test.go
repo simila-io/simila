@@ -27,7 +27,7 @@ import (
 )
 
 type (
-	pgSharedTestSuite struct {
+	pgCommonTestSuite struct {
 		pgTestSuite
 	}
 
@@ -40,8 +40,8 @@ type (
 	}
 )
 
-func TestRunSharedTestSuite(t *testing.T) {
-	suite.Run(t, &pgSharedTestSuite{newPqTestSuite(SearchModuleNone)})
+func TestRunCommonTestSuite(t *testing.T) {
+	suite.Run(t, &pgCommonTestSuite{newPqTestSuite(SearchModuleNone)})
 }
 
 func TestRunGroongaTestSuite(t *testing.T) {
@@ -52,9 +52,9 @@ func TestRunTrgmTestSuite(t *testing.T) {
 	suite.Run(t, &pgTrigramTestSuite{newPqTestSuite(SearchModuleTrigram)})
 }
 
-// shared
+// common
 
-func (ts *pgSharedTestSuite) TestFormat() {
+func (ts *pgCommonTestSuite) TestFormat() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	fmts, err := mtx.ListFormats()
@@ -88,7 +88,7 @@ func (ts *pgSharedTestSuite) TestFormat() {
 	assert.ErrorIs(ts.T(), err, errors.ErrNotExist)
 }
 
-func (ts *pgSharedTestSuite) TestIndex() {
+func (ts *pgCommonTestSuite) TestIndex() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
@@ -123,7 +123,7 @@ func (ts *pgSharedTestSuite) TestIndex() {
 	assert.ErrorIs(ts.T(), err, errors.ErrNotExist)
 }
 
-func (ts *pgSharedTestSuite) TestIndexRecord() {
+func (ts *pgCommonTestSuite) TestIndexRecord() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})
@@ -168,7 +168,7 @@ func (ts *pgSharedTestSuite) TestIndexRecord() {
 	assert.Equal(ts.T(), 0, n)
 }
 
-func (ts *pgSharedTestSuite) TestConstraints() {
+func (ts *pgCommonTestSuite) TestConstraints() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{})
