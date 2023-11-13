@@ -62,7 +62,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		GrpcTransport: transport.GetDefaultGRPCConfig(),
 		HttpPort:      8080,
-		SearchEngine:  postgres.SearchModuleNone,
+		SearchEngine:  postgres.SearchModuleTrgm,
 		DB: &DB{
 			Driver:   "postgres",
 			Host:     "localhost",

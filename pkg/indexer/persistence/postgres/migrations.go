@@ -80,13 +80,6 @@ delete from format where id='txt';
 `
 )
 
-func init() {
-	// ignore unknown migrations, this allows to switch
-	// between migrations of different search implementations
-	// without the need of "tweaking" the DB
-	migrate.SetIgnoreUnknown(true)
-}
-
 func initSchema(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
@@ -131,7 +124,7 @@ func migrateDownShared(ctx context.Context, db *sql.DB) error {
 
 // pgroonga
 
-func migrateUpSharedAndPgGroonga(ctx context.Context, db *sql.DB) error {
+func migratePgGroongaUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
 	migrs = append(migrs, pgroonga.Migrations()...)
@@ -144,21 +137,13 @@ func migrateUpSharedAndPgGroonga(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func migrateDownSharedAndPgGroonga(ctx context.Context, db *sql.DB) error {
+func migratePgGroongaDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
 	migrs = append(migrs, pgroonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
-	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
-		return err
-	}
-	return nil
-}
-
-func migrateDownPgGroonga(ctx context.Context, db *sql.DB) error {
-	mms := migrate.MemoryMigrationSource{Migrations: pgroonga.Migrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
 		return err
 	}
@@ -167,7 +152,7 @@ func migrateDownPgGroonga(ctx context.Context, db *sql.DB) error {
 
 // pgtrgm
 
-func migrateUpSharedAndPgTrgm(ctx context.Context, db *sql.DB) error {
+func migratePgTrgmUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
 	migrs = append(migrs, pgtrgm.Migrations()...)
@@ -181,22 +166,13 @@ func migrateUpSharedAndPgTrgm(ctx context.Context, db *sql.DB) error {
 
 }
 
-func migrateDownSharedAndPgTrgm(ctx context.Context, db *sql.DB) error {
+func migratePgTrgmDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
 	migrs = append(migrs, pgtrgm.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
-	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
-		return err
-	}
-	return nil
-
-}
-
-func migrateDownPgTrgm(ctx context.Context, db *sql.DB) error {
-	mms := migrate.MemoryMigrationSource{Migrations: pgtrgm.Migrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
 		return err
 	}

@@ -32,10 +32,6 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to the database: %w", err)
 	}
-	if err = rollbackNotCurrent(ctx, db, search); err != nil {
-		return nil, fmt.Errorf("rollback failed: %w", err)
-	}
-
 	switch search {
 	case SearchModuleNone:
 		return getPgNonSpecificDb(ctx, db)
@@ -55,7 +51,7 @@ func getPgNonSpecificDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 }
 
 func getPgGroongaDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migrateUpSharedAndPgGroonga(ctx, db.DB); err != nil {
+	if err := migratePgGroongaUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 	if err := setSessionParams(ctx, db, pgroonga.SessionParams()); err != nil {
@@ -65,27 +61,13 @@ func getPgGroongaDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 }
 
 func getPgTrgmDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migrateUpSharedAndPgTrgm(ctx, db.DB); err != nil {
+	if err := migratePgTrgmUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 	if err := setSessionParams(ctx, db, pgtrgm.SessionParams()); err != nil {
 		return nil, fmt.Errorf("session params set failed: %w", err)
 	}
 	return newDb(db, pgtrgm.SearchFn), nil
-}
-
-// rollbackNotCurrent rolls back migrations that DO NOT belong
-// to curr, since the greatest migration found in DB must either
-// belong to curr module migrations or be the "shared" one.
-func rollbackNotCurrent(ctx context.Context, db *sqlx.DB, curr SearchModuleName) error {
-	var err error
-	switch curr {
-	case SearchModuleGroonga:
-		err = migrateDownPgTrgm(ctx, db.DB)
-	case SearchModuleTrgm:
-		err = migrateDownPgGroonga(ctx, db.DB)
-	}
-	return err
 }
 
 func setSessionParams(ctx context.Context, db *sqlx.DB, sessParams map[string]any) error {

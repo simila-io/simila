@@ -88,8 +88,8 @@ db-start: ## start the postgres server locally in docker
 	@mkdir -p data/postgres
 	@docker run --rm --name postgres-db -v $(shell pwd)/data:/data \
 		-v $(shell pwd)/data/postgres:/var/lib/postgresql/data \
-		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=simila -d -p 5432:5432 groonga/pgroonga:latest-debian-16
-	@echo "Database started at port 5423"
+		-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=simila -d -p 5432:5432 postgres:16-alpine
+	@echo "Database started at port 5432"
 
 .PHONY: db-stop
 db-stop: ## stop the database server
