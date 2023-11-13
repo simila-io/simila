@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/jmoiron/sqlx"
-	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgroonga"
-	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgtrgm"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/groonga"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/trigram"
 )
 
 const (
 	SearchModuleNone    = ""
 	SearchModuleGroonga = "pgroonga"
-	SearchModuleTrgm    = "pgtrgm"
+	SearchModuleTrigram = "pgtrigram"
+	SearchModuleFts     = "pgfts"
 )
 
 type SearchModuleName string
@@ -34,40 +35,37 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 	}
 	switch search {
 	case SearchModuleNone:
-		return getPgNonSpecificDb(ctx, db)
+		return getDefaultDb(ctx, db)
 	case SearchModuleGroonga:
-		return getPgGroongaDb(ctx, db)
-	case SearchModuleTrgm:
-		return getPgTrgmDb(ctx, db)
+		return getGroongaDb(ctx, db)
+	case SearchModuleTrigram:
+		return getTrigramDb(ctx, db)
 	}
 	return nil, fmt.Errorf("unsupported postgres search module=%s: %w", search, errors.ErrInvalid)
 }
 
-func getPgNonSpecificDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
+func getDefaultDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 	if err := migrateSharedUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 	return newDb(db, nil), nil
 }
 
-func getPgGroongaDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migratePgGroongaUp(ctx, db.DB); err != nil {
+func getGroongaDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
+	if err := migrateGroongaUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
-	if err := setSessionParams(ctx, db, pgroonga.SessionParams()); err != nil {
-		return nil, fmt.Errorf("session params set failed: %w", err)
-	}
-	return newDb(db, pgroonga.SearchFn), nil
+	return newDb(db, groonga.Search), nil
 }
 
-func getPgTrgmDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migratePgTrgmUp(ctx, db.DB); err != nil {
+func getTrigramDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
+	if err := migrateTrigramUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
-	if err := setSessionParams(ctx, db, pgtrgm.SessionParams()); err != nil {
+	if err := setSessionParams(ctx, db, trigram.SessionParams()); err != nil {
 		return nil, fmt.Errorf("session params set failed: %w", err)
 	}
-	return newDb(db, pgtrgm.SearchFn), nil
+	return newDb(db, trigram.Search), nil
 }
 
 func setSessionParams(ctx context.Context, db *sqlx.DB, sessParams map[string]any) error {

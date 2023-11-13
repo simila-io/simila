@@ -1,4 +1,4 @@
-package pgroonga
+package groonga
 
 import (
 	"context"
@@ -6,22 +6,51 @@ import (
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
+	migrate "github.com/rubenv/sql-migrate"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"strings"
 )
 
-// SessionParams returns a map of k:v pairs, which represent DB settings
-// to be applied as soon as the DB session is started. This may be needed
-// to tweak parameters of the DB extension, since some controlled DB envs
-// (e.g. RDS) do not always allow to modify system or DB settings on a
-// permanent basis (i.e. ALTER SYSTEM/DATABASE SET..).
-func SessionParams() map[string]any {
-	return map[string]any{}
+const (
+	createExtensionUp = `
+create extension if not exists pgroonga;
+`
+	createSegmentIndexUp = `
+create index if not exists "idx_index_record_segment_groonga" on "index_record" using pgroonga ("segment") with (tokenizer='TokenNgram("unify_alphabet", false, "unify_symbol", false, "unify_digit", false)');
+`
+	createSegmentIndexDown = `
+drop index if exists "idx_index_record_segment_groonga";
+`
+)
+
+func createExtension(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id: id,
+		Up: []string{createExtensionUp},
+	}
 }
 
-// SearchFn is an implementation of the search
-// module based on the "pgroonga" DB extension.
-func SearchFn(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
+func createSegmentIndex(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:   id,
+		Up:   []string{createSegmentIndexUp},
+		Down: []string{createSegmentIndexDown},
+	}
+}
+
+// Migrations returns migrations to be applied on top of
+// the "shared" migrations for the "groonga" search module to work,
+// the "groonga" module migration IDs range is [1xxxxx ... 19xxxx]
+func Migrations() []*migrate.Migration {
+	return []*migrate.Migration{
+		createExtension("100001"),
+		createSegmentIndex("100002"),
+	}
+}
+
+// Search is an implementation of the postgres.SearchFn
+// function based on the "pgroonga" postgres extension.
+func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}

@@ -1,4 +1,4 @@
-package pgtrgm
+package trigram
 
 import (
 	"context"
@@ -6,9 +6,47 @@ import (
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
+	migrate "github.com/rubenv/sql-migrate"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"strings"
 )
+
+const (
+	createExtensionUp = `
+create extension if not exists pg_trgm;
+`
+	createSegmentIndexUp = `
+create index if not exists "idx_index_record_segment_trgm" on "index_record" using gin ("segment" gin_trgm_ops);
+`
+	createSegmentIndexDown = `
+drop index if exists "idx_index_record_segment_trgm";
+`
+)
+
+func createExtension(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id: id,
+		Up: []string{createExtensionUp},
+	}
+}
+
+func createSegmentIndex(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:   id,
+		Up:   []string{createSegmentIndexUp},
+		Down: []string{createSegmentIndexDown},
+	}
+}
+
+// Migrations returns migrations to be applied on top of
+// the "shared" migrations for the "trigram" search module to work,
+// the "trigram" module migration IDs range is [2xxxxx ... 29xxxx]
+func Migrations() []*migrate.Migration {
+	return []*migrate.Migration{
+		createExtension("200001"),
+		createSegmentIndex("200002"),
+	}
+}
 
 // SessionParams returns a map of k:v pairs, which represent DB settings
 // to be applied as soon as the DB session is started. This may be needed
@@ -19,9 +57,9 @@ func SessionParams() map[string]any {
 	return map[string]any{"pg_trgm.word_similarity_threshold": 0.3}
 }
 
-// SearchFn is an implementation of the search
-// module based on the "pgtrgm" DB extension.
-func SearchFn(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
+// Search is an implementation of the postgres.SearchFn
+// function based on the "pg_trgm" postgres extension.
+func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
@@ -138,13 +176,14 @@ func SearchFn(ctx context.Context, q sqlx.QueryerContext, query persistence.Sear
 }
 
 func mapKeywordsFn(query string) func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
+	trimSet := "!@#$%^&*(){}[]|:\".,?"
 	wordMap := make(map[string]struct{})
 	for _, w := range strings.Fields(query) {
-		wordMap[strings.ToLower(w)] = struct{}{}
+		wordMap[strings.Trim(strings.ToLower(w), trimSet)] = struct{}{}
 	}
 	return func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
 		for _, w := range strings.Fields(item.Segment) {
-			if _, ok := wordMap[strings.ToLower(w)]; ok {
+			if _, ok := wordMap[strings.Trim(strings.ToLower(w), trimSet)]; ok {
 				item.MatchedKeywordsList = append(item.MatchedKeywordsList, w)
 			}
 		}

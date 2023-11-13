@@ -35,7 +35,7 @@ type (
 		pgTestSuite
 	}
 
-	pgTrgmTestSuite struct {
+	pgTrigramTestSuite struct {
 		pgTestSuite
 	}
 )
@@ -49,7 +49,7 @@ func TestRunGroongaTestSuite(t *testing.T) {
 }
 
 func TestRunTrgmTestSuite(t *testing.T) {
-	suite.Run(t, &pgTrgmTestSuite{newPqTestSuite(SearchModuleTrgm)})
+	suite.Run(t, &pgTrigramTestSuite{newPqTestSuite(SearchModuleTrigram)})
 }
 
 // shared
@@ -183,7 +183,7 @@ func (ts *pgSharedTestSuite) TestConstraints() {
 	assert.ErrorIs(ts.T(), err, errors.ErrConflict)
 }
 
-// pgroonga
+// groonga
 
 func (ts *pgGroongaTestSuite) TestSearch() {
 	mtx := ts.db.NewModelTx(context.Background())
@@ -291,9 +291,9 @@ func (ts *pgGroongaTestSuite) TestSearch() {
 	assert.Equal(ts.T(), "ha", res5.Items[4].MatchedKeywordsList[0])
 }
 
-// pgtrgm
+// trigram
 
-func (ts *pgTrgmTestSuite) TestSearch() {
+func (ts *pgTrigramTestSuite) TestSearch() {
 	mtx := ts.db.NewModelTx(context.Background())
 
 	bas, err := json.Marshal([]map[string]any{{"Name": "page", "Type": "number"}, {"Name": "mark", "Type": "string"}})

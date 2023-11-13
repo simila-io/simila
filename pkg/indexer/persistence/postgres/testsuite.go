@@ -37,7 +37,7 @@ func (ts *pgTestSuite) SetupSuite() {
 		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
 			"groonga/pgroonga:latest-debian-16", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
-	case SearchModuleNone, SearchModuleTrgm:
+	case SearchModuleNone, SearchModuleTrigram:
 		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
 			"postgres:16-alpine", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)

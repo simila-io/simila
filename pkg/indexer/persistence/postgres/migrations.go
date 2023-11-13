@@ -18,8 +18,8 @@ import (
 	"context"
 	"database/sql"
 	migrate "github.com/rubenv/sql-migrate"
-	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgroonga"
-	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/pgtrgm"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/groonga"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/trigram"
 )
 
 const (
@@ -122,12 +122,12 @@ func migrateSharedDown(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// pgroonga
+// groonga
 
-func migratePgGroongaUp(ctx context.Context, db *sql.DB) error {
+func migrateGroongaUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
-	migrs = append(migrs, pgroonga.Migrations()...)
+	migrs = append(migrs, groonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -137,10 +137,10 @@ func migratePgGroongaUp(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func migratePgGroongaDown(ctx context.Context, db *sql.DB) error {
+func migrateGroongaDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
-	migrs = append(migrs, pgroonga.Migrations()...)
+	migrs = append(migrs, groonga.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -150,12 +150,12 @@ func migratePgGroongaDown(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// pgtrgm
+// trigram
 
-func migratePgTrgmUp(ctx context.Context, db *sql.DB) error {
+func migrateTrigramUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
-	migrs = append(migrs, pgtrgm.Migrations()...)
+	migrs = append(migrs, trigram.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -166,10 +166,10 @@ func migratePgTrgmUp(ctx context.Context, db *sql.DB) error {
 
 }
 
-func migratePgTrgmDown(ctx context.Context, db *sql.DB) error {
+func migrateTrigramDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, sharedMigrations()...)
-	migrs = append(migrs, pgtrgm.Migrations()...)
+	migrs = append(migrs, trigram.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
