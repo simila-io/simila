@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/jmoiron/sqlx"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/fts"
 	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/groonga"
 	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/trigram"
 )
@@ -40,6 +41,8 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 		return getGroongaDb(ctx, db)
 	case SearchModuleTrigram:
 		return getTrigramDb(ctx, db)
+	case SearchModuleFts:
+		return getFtsDb(ctx, db)
 	}
 	return nil, fmt.Errorf("unsupported postgres search module=%s: %w", search, errors.ErrInvalid)
 }
@@ -66,6 +69,13 @@ func getTrigramDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 		return nil, fmt.Errorf("session params set failed: %w", err)
 	}
 	return newDb(db, trigram.Search), nil
+}
+
+func getFtsDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
+	if err := migrateFtsUp(ctx, db.DB); err != nil {
+		return nil, fmt.Errorf("migration failed: %w", err)
+	}
+	return newDb(db, fts.Search), nil
 }
 
 func setSessionParams(ctx context.Context, db *sqlx.DB, sessParams map[string]any) error {

@@ -37,10 +37,12 @@ func (ts *pgTestSuite) SetupSuite() {
 		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
 			"groonga/pgroonga:latest-debian-16", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
-	case SearchModuleNone, SearchModuleTrigram:
+	case SearchModuleNone, SearchModuleTrigram, SearchModuleFts:
 		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
 			"postgres:16-alpine", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
+	default:
+		assert.Fail(ts.T(), "unsupported postgres search module: %s", ts.sModule)
 	}
 }
 

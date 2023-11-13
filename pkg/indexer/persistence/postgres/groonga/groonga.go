@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/acquirecloud/golibs/errors"
-	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
@@ -133,7 +132,8 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 
 	// count
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score from index_record "+
+		"from (select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score "+
+		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s)", distinct, where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
@@ -147,14 +147,16 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	rows, err := q.QueryxContext(ctx, fmt.Sprintf("select %s index_record.*, "+
 		"pgroonga_highlight_html (index_record.segment, pgroonga_query_extract_keywords($%d)) as matched_keywords, "+
 		"pgroonga_score(index_record.tableoid, index_record.ctid) as score "+
-		"from index_record inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
+		"from index_record "+
+		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
 		distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
 
 	// results
-	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywords)
+	res, err := persistence.ScanRowsQueryResultAndMap(rows,
+		persistence.MapKeywordsToListFn("<span class=\"keyword\">", "</span>"))
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
@@ -164,17 +166,4 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 		res = res[:query.Limit]
 	}
 	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
-}
-
-func mapKeywords(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
-	kwArr := strings.Split(item.MatchedKeywords, "<span class=\"keyword\">")
-	if len(kwArr) == 0 {
-		return item
-	}
-	kwArr = kwArr[1:]
-	for i := 0; i < len(kwArr); i++ {
-		kwArr[i] = strings.TrimSpace(strings.Split(kwArr[i], "</span>")[0])
-	}
-	item.MatchedKeywordsList = strutil.RemoveDups(kwArr)
-	return item
 }

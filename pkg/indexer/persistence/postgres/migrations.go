@@ -18,6 +18,7 @@ import (
 	"context"
 	"database/sql"
 	migrate "github.com/rubenv/sql-migrate"
+	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/fts"
 	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/groonga"
 	"github.com/simila-io/simila/pkg/indexer/persistence/postgres/trigram"
 )
@@ -170,6 +171,35 @@ func migrateTrigramDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
 	migrs = append(migrs, trigram.Migrations()...)
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	return nil
+}
+
+// fts
+
+func migrateFtsUp(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, migrations()...)
+	migrs = append(migrs, fts.Migrations()...)
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func migrateFtsDown(ctx context.Context, db *sql.DB) error {
+	var migrs []*migrate.Migration
+	migrs = append(migrs, migrations()...)
+	migrs = append(migrs, fts.Migrations()...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}

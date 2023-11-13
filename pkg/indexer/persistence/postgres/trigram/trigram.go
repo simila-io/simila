@@ -143,7 +143,8 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	// count
 	args = append(args, query.Query)
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, 1.0 - (segment <->> $%d) as score from index_record "+
+		"from (select %s index_record.*, 1.0 - (index_record.segment <->> $%d) as score "+
+		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s)", distinct, len(args), where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
@@ -155,7 +156,8 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	}
 	args = append(args, query.Offset, limit)
 	rows, err := q.QueryxContext(ctx, fmt.Sprintf("select %s index_record.*, "+
-		"1 - (segment <->> $%d) as score from index_record "+
+		"1 - (index_record.segment <->> $%d) as score "+
+		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
 		distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
 	if err != nil {
@@ -163,7 +165,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	}
 
 	// results
-	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywordsFn(query.Query))
+	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywordsToListFn(query.Query))
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
@@ -175,7 +177,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
 }
 
-func mapKeywordsFn(query string) func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
+func mapKeywordsToListFn(query string) func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
 	trimSet := "!@#$%^&*(){}[]|:\".,?"
 	wordMap := make(map[string]struct{})
 	for _, w := range strings.Fields(query) {

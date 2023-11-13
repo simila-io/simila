@@ -2,7 +2,9 @@ package persistence
 
 import (
 	"context"
+	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
+	"strings"
 )
 
 func ScanRows[T any](rows *sqlx.Rows) ([]T, error) {
@@ -58,4 +60,19 @@ func Count(ctx context.Context, q sqlx.QueryerContext, query string, params ...a
 		_ = rows.Close()
 	}()
 	return Scan[int64](rows)
+}
+
+func MapKeywordsToListFn(startMark, endMark string) func(item SearchQueryResultItem) SearchQueryResultItem {
+	return func(item SearchQueryResultItem) SearchQueryResultItem {
+		kwArr := strings.Split(item.MatchedKeywords, startMark)
+		if len(kwArr) == 0 {
+			return item
+		}
+		kwArr = kwArr[1:]
+		for i := 0; i < len(kwArr); i++ {
+			kwArr[i] = strings.TrimSpace(strings.Split(kwArr[i], endMark)[0])
+		}
+		item.MatchedKeywordsList = strutil.RemoveDups(kwArr)
+		return item
+	}
 }

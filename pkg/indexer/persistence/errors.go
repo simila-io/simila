@@ -31,5 +31,5 @@ func mapPqError(err error) error {
 			return fmt.Errorf("%v: %w", pqErr.Message, errors.ErrExist)
 		}
 	}
-	return nil
+	return err
 }

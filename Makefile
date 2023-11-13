@@ -96,6 +96,11 @@ db-stop: ## stop the database server
 	@docker stop postgres-db
 	@echo "Database stopped"
 
+.PHONY: db-drop
+db-drop: db-stop ## stop the database server and drop the db
+	@rm -rf $(shell pwd)/data/postgres
+	@echo "Database dropped"
+
 .PHONY: docker-rmi
 docker-rmi: ## removes the docker image
 	docker rmi -f $(shell docker images --filter=reference=${IMAGE_NAME} -q | uniq)
@@ -108,6 +113,10 @@ compose-up: docker-build ## run the docker compose
 .PHONY: compose-down
 compose-down:  ## stop the docker compose
 	docker-compose -f docker-compose.yaml down --remove-orphans
+
+.PHONY: compose-drop
+compose-drop:  ## stop the docker compose and remove the volumes
+	docker-compose -f docker-compose.yaml down --volume --remove-orphans
 
 .PHONY: compose-logs
 compose-logs:  ## show the docker compose logs

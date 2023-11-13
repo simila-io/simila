@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// common
+
 func (ts *pgCommonTestSuite) TestMigrations() {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFn()
@@ -29,6 +31,8 @@ func (ts *pgCommonTestSuite) TestMigrations() {
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)
 }
+
+// groonga
 
 func (ts *pgGroongaTestSuite) TestMigrations() {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
@@ -53,6 +57,8 @@ func (ts *pgGroongaTestSuite) TestMigrations() {
 	assert.Equal(ts.T(), int64(0), count)
 }
 
+//  trigram
+
 func (ts *pgTrigramTestSuite) TestMigrations() {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFn()
@@ -71,6 +77,31 @@ func (ts *pgTrigramTestSuite) TestMigrations() {
 
 	// down
 	assert.NoError(ts.T(), migrateTrigramDown(ctx, ts.db.db.DB))
+	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(0), count)
+}
+
+// fts
+
+func (ts *pgFtsTestSuite) TestMigrations() {
+	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelFn()
+
+	// down
+	assert.NoError(ts.T(), migrateFtsDown(ctx, ts.db.db.DB))
+	count, err := persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(0), count)
+
+	// up
+	assert.NoError(ts.T(), migrateFtsUp(ctx, ts.db.db.DB))
+	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
+	assert.Nil(ts.T(), err)
+	assert.Equal(ts.T(), int64(3), count)
+
+	// down
+	assert.NoError(ts.T(), migrateFtsDown(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)
