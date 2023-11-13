@@ -12,19 +12,19 @@ func (ts *pgSharedTestSuite) TestMigrations() {
 	defer cancelFn()
 
 	// down
-	assert.NoError(ts.T(), migrateDownShared(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateSharedDown(ctx, ts.db.db.DB))
 	count, err := persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)
 
 	// up
-	assert.NoError(ts.T(), migrateUpShared(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateSharedUp(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(2), count)
 
 	// down
-	assert.NoError(ts.T(), migrateDownShared(ctx, ts.db.db.DB))
+	assert.NoError(ts.T(), migrateSharedDown(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
 	assert.Equal(ts.T(), int64(0), count)

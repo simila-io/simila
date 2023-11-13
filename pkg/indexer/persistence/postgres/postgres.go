@@ -44,7 +44,7 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 }
 
 func getPgNonSpecificDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
-	if err := migrateUpShared(ctx, db.DB); err != nil {
+	if err := migrateSharedUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 	return newDb(db, nil), nil

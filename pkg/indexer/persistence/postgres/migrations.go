@@ -98,7 +98,7 @@ func addTxtFormat(id string) *migrate.Migration {
 
 // sharedMigrations returns migrations to be reused for
 // all the specific search implementations, the range of
-// "shared migrations" IDs [0xxxxx ... 09xxxx]
+// "shared" migrations IDs [0xxxxx ... 09xxxx]
 func sharedMigrations() []*migrate.Migration {
 	return []*migrate.Migration{
 		initSchema("000001"),
@@ -106,7 +106,7 @@ func sharedMigrations() []*migrate.Migration {
 	}
 }
 
-func migrateUpShared(ctx context.Context, db *sql.DB) error {
+func migrateSharedUp(ctx context.Context, db *sql.DB) error {
 	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Up); err != nil {
 		return err
@@ -114,7 +114,7 @@ func migrateUpShared(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func migrateDownShared(ctx context.Context, db *sql.DB) error {
+func migrateSharedDown(ctx context.Context, db *sql.DB) error {
 	mms := migrate.MemoryMigrationSource{Migrations: sharedMigrations()}
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
 		return err
