@@ -78,7 +78,7 @@ paths:
       tags:
         - Indexes
       summary: Create new index
-      description: The call allows to create a new index. The call also allows to create the index records as well.
+      description: The call allows to create a new index. The call also allows to create the index records as well. The call accepts two different contatent types - json and multiform data. The index metadata is described as JSON together with possible new index records or the document context, which maybe passed as a binary slice or as a stream.
       operationId: CreateIndex
       requestBody:
         required: true
@@ -109,7 +109,7 @@ paths:
       tags:
         - Indexes
       summary: Retreive indexes
-      description: The call returns all known formats.
+      description: The call returns all known indexes. It supports pagination and filtering by the query params.
       operationId: GetIndexes
       parameters:
         - $ref: '#/components/parameters/CreatedAfter'
@@ -129,7 +129,7 @@ paths:
     get:
       tags:
         - Indexes
-      description:
+      description: retrieves the index by its ID.
       operationId: GetIndex
       parameters:
         - $ref: '#/components/parameters/IndexId'
@@ -145,7 +145,7 @@ paths:
     put:
       tags:
         - Indexes
-      description:
+      description: allows to update index.
       operationId: PutIndex
       parameters:
         - $ref: '#/components/parameters/IndexId'
@@ -167,7 +167,7 @@ paths:
     delete:
       tags:
         - Indexes
-      description:
+      description: allows to delete an existing index.
       operationId: DeleteIndex
       parameters:
         - $ref: '#/components/parameters/IndexId'
@@ -180,7 +180,7 @@ paths:
     get:
       tags:
         - Indexes
-      description:
+      description: returns an index's records in the record IDs order.
       operationId: GetIndexRecords
       parameters:
         - $ref: '#/components/parameters/IndexId'
@@ -198,7 +198,7 @@ paths:
     patch:
       tags:
         - Indexes
-      description:
+      description: provides a group index records update. The operation has the list ofr records that should be inserted or replaced and the list of recors that should be deleted from the index.
       operationId: PatchIndexRecords
       parameters:
         - $ref: '#/components/parameters/IndexId'
@@ -221,7 +221,7 @@ paths:
     get:
       tags:
         - Ping
-      description:
+      description: service check operation.
       operationId: Ping
       responses:
         200:
@@ -234,7 +234,7 @@ paths:
     post:
       tags:
         - Search
-      description:
+      description: The call runs the text search across indexes' records. It accepts different search parameters for filtering and the output.
       operationId: Search
       requestBody:
         required: true
