@@ -98,7 +98,7 @@ func (ts *pgFtsTestSuite) TestMigrations() {
 	assert.NoError(ts.T(), migrateFtsUp(ctx, ts.db.db.DB))
 	count, err = persistence.Count(ctx, ts.db.db, "select count(*) from gorp_migrations")
 	assert.Nil(ts.T(), err)
-	assert.Equal(ts.T(), int64(3), count)
+	assert.Equal(ts.T(), int64(4), count)
 
 	// down
 	assert.NoError(ts.T(), migrateFtsDown(ctx, ts.db.db.DB))

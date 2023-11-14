@@ -86,6 +86,9 @@ type (
 		MatchedKeywordsList []string // mapped manually after filling the MatchedKeywords
 		MatchedKeywords     string   `db:"matched_keywords"`
 		Score               float32  `db:"score"`
+
+		// search modules specific fields
+		SegmentTsVector string `db:"segment_tsvector"`
 	}
 
 	QueryResult[T any, N any] struct {

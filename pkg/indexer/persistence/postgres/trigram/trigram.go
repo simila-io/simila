@@ -25,8 +25,9 @@ drop index if exists "idx_index_record_segment_trgm";
 
 func createExtension(id string) *migrate.Migration {
 	return &migrate.Migration{
-		Id: id,
-		Up: []string{createExtensionUp},
+		Id:                   id,
+		Up:                   []string{createExtensionUp},
+		DisableTransactionUp: true,
 	}
 }
 
@@ -59,6 +60,9 @@ func SessionParams() map[string]any {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the "pg_trgm" postgres extension.
+// Queries are just text, no conditional expressions are supported for now,
+// the whole segment of text is matched against the whole query text using `word similarity`,
+// see https://www.postgresql.org/docs/current/pgtrgm.html.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
@@ -145,7 +149,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
 		"from (select %s index_record.*, 1.0 - (index_record.segment <->> $%d) as score "+
 		"from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s)", distinct, len(args), where, orderBy), args...)
+		"inner join index on index.id = index_record.index_id %s %s) as r", distinct, len(args), where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}

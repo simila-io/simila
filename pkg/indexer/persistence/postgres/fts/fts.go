@@ -11,19 +11,40 @@ import (
 )
 
 const (
-	createSegmentIndexUp = `
-create index if not exists idx_index_record_segment_fts_en on index_record using gin (to_tsvector('english', segment));
+	createTsConfigUp = `
+create text search configuration public.simila (copy = pg_catalog.english);
 `
-	createSegmentIndexDown = `
-drop index if exists "idx_index_record_segment_fts_en";
+	createTsConfigDown = `
+drop text search configuration public.simila cascade;
+`
+	createSegmentTsVectorUp = ` 
+alter table "index_record"
+    add column if not exists "segment_tsvector" tsvector generated always as (to_tsvector('public.simila', "segment")) stored;
+
+create index if not exists "idx_index_record_segment_tsvector" on "index_record" using gin ("segment_tsvector");
+`
+	createSegmentTsVectorDown = ` 
+drop index if exists "idx_index_record_segment_tsvector";
+
+alter table "index_record" drop column if exists "idx_index_record_segment_tsvector";
 `
 )
 
-func createSegmentIndex(id string) *migrate.Migration {
+func createTsConfig(id string) *migrate.Migration {
+	return &migrate.Migration{
+		Id:                     id,
+		Up:                     []string{createTsConfigUp},
+		Down:                   []string{createTsConfigDown},
+		DisableTransactionUp:   true,
+		DisableTransactionDown: true,
+	}
+}
+
+func createSegmentTsVector(id string) *migrate.Migration {
 	return &migrate.Migration{
 		Id:   id,
-		Up:   []string{createSegmentIndexUp},
-		Down: []string{createSegmentIndexDown},
+		Up:   []string{createSegmentTsVectorUp},
+		Down: []string{createSegmentTsVectorDown},
 	}
 }
 
@@ -32,15 +53,15 @@ func createSegmentIndex(id string) *migrate.Migration {
 // module to work, the module migration IDs range is [3000-3999]
 func Migrations() []*migrate.Migration {
 	return []*migrate.Migration{
-		createSegmentIndex("3000"),
+		createTsConfig("3000"),
+		createSegmentTsVector("3001"),
 	}
 }
 
-// TODO: separate column for ts_vector?
-// TODO: support other languages than english?
-
 // Search is an implementation of the postgres.SearchFn
 // function based on the postgres built-in full-text search.
+// Queries must be formed in accordance with the `websearch_to_tsquery()` syntax,
+// see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
@@ -95,7 +116,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 		if len(args) > 0 {
 			sb.WriteString(" and ")
 		}
-		sb.WriteString(" to_tsvector('english', index_record.segment) @@ websearch_to_tsquery('english', ?) ")
+		sb.WriteString(" index_record.segment_tsvector @@ websearch_to_tsquery('public.simila', ?) ")
 		args = append(args, query.Query)
 	}
 
@@ -125,9 +146,9 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	// count
 	args = append(args, query.Query)
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, ts_rank_cd(to_tsvector('english', index_record.segment), websearch_to_tsquery('english', $%d)) as score "+
+		"from (select %s index_record.*, ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('public.simila', $%d)) as score "+
 		"from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s)", distinct, len(args), where, orderBy), args...)
+		"inner join index on index.id = index_record.index_id %s %s) as r", distinct, len(args), where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
@@ -138,8 +159,8 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	}
 	args = append(args, query.Offset, limit)
 	rows, err := q.QueryxContext(ctx, fmt.Sprintf("select %s index_record.*, "+
-		"ts_rank_cd(to_tsvector('english', index_record.segment), websearch_to_tsquery('english', $%d)) as score, "+
-		"ts_headline(index_record.segment, websearch_to_tsquery('english', $%d), 'MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>') as matched_keywords "+
+		"ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('public.simila', $%d)) as score, "+
+		"ts_headline(index_record.segment, websearch_to_tsquery('public.simila', $%d), 'MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>') as matched_keywords "+
 		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
 		distinct, len(args)-2, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)

@@ -24,8 +24,9 @@ drop index if exists "idx_index_record_segment_groonga";
 
 func createExtension(id string) *migrate.Migration {
 	return &migrate.Migration{
-		Id: id,
-		Up: []string{createExtensionUp},
+		Id:                   id,
+		Up:                   []string{createExtensionUp},
+		DisableTransactionUp: true,
 	}
 }
 
@@ -39,7 +40,9 @@ func createSegmentIndex(id string) *migrate.Migration {
 
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the "groonga" search module to work,
-// the "groonga" module migration IDs range is [1000-1999]
+// the "groonga" module migration IDs range is [1000-1999].
+// Queries must be formed in accordance with the pgroonga query operator syntax,
+// see https://pgroonga.github.io/reference/operators/query-v2.html
 func Migrations() []*migrate.Migration {
 	return []*migrate.Migration{
 		createExtension("1000"),
@@ -49,6 +52,8 @@ func Migrations() []*migrate.Migration {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the "pgroonga" postgres extension.
+// Queries must be formed in accordance with the `websearch_to_tsquery()` query syntax,
+// see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
@@ -134,7 +139,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
 		"from (select %s index_record.*, pgroonga_score(index_record.tableoid, index_record.ctid) as score "+
 		"from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s)", distinct, where, orderBy), args...)
+		"inner join index on index.id = index_record.index_id %s %s) as r", distinct, where, orderBy), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}

@@ -27,23 +27,34 @@ func (ts *pgTestSuite) SetupSuite() {
 	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFn()
 
-	// For localhost DB use NewNilDbContainer:
-	// 	ts.dbCont, err = persistence.NewNilDbContainer(persistence.WithPort("5432"), persistence.WithDbName("simila_test"))
-	// 	assert.Nil(ts.T(), err)
-
 	var err error
+	var dbCont persistence.DbContainer
+
 	switch ts.sModule {
 	case SearchModuleGroonga:
-		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
+		dbCont, err = persistence.NewPgDbContainer(ctx,
 			"groonga/pgroonga:latest-debian-16", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
 	case SearchModuleNone, SearchModuleTrigram, SearchModuleFts:
-		ts.dbCont, err = persistence.NewPgDbContainer(ctx,
+		dbCont, err = persistence.NewPgDbContainer(ctx,
 			"postgres:16-alpine", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
 	default:
-		assert.Fail(ts.T(), "unsupported postgres search module: %s", ts.sModule)
+		err = fmt.Errorf("unsupported postgres search module: %s", ts.sModule)
 	}
+
+	// For non-container DB use NewNilDbContainer:
+	//
+	//dbCont, err = persistence.NewNilDbContainer(
+	//	persistence.WithHost("127.0.0.1"),
+	//	persistence.WithUser("postgres"),
+	//	persistence.WithPassword("postgres"),
+	//	persistence.WithPort("5432"),
+	//	persistence.WithDbName("simila_test"),
+	//	persistence.WithSslMode("disable"))
+
+	assert.Nil(ts.T(), err)
+	ts.dbCont = dbCont
 }
 
 func (ts *pgTestSuite) TearDownSuite() {

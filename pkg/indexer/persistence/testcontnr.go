@@ -34,6 +34,18 @@ type (
 	}
 )
 
+func WithUser(user string) DbOption {
+	return func(c *DbConfig) {
+		c.User = user
+	}
+}
+
+func WithPassword(password string) DbOption {
+	return func(c *DbConfig) {
+		c.Password = password
+	}
+}
+
 func WithHost(host string) DbOption {
 	return func(c *DbConfig) {
 		c.Host = host
@@ -49,6 +61,12 @@ func WithPort(port string) DbOption {
 func WithDbName(dbName string) DbOption {
 	return func(c *DbConfig) {
 		c.DbName = dbName
+	}
+}
+
+func WithSslMode(sslMode string) DbOption { // disable, require
+	return func(c *DbConfig) {
+		c.SslMode = sslMode
 	}
 }
 
