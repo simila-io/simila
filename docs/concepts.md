@@ -48,5 +48,12 @@ Parsers split into two groups - internal and external. The internal parser is th
 ### Tags
 A tag is a `<key:value>` pair where the `key` and the `value` are text values. Tags are the list of pairs with unique keys. Tags may be applied to the indexes and then used in the queries for selecting some group of indexes.
 
-## Design
-TBD.
+## High-level design (in few words)
+Simila highl-level design is depicted in the following diagram:
+![](../assets/imgs/Simila-design.png)
+
+There are two main components there - Simila service and the Simila DB. 
+
+The Simila service is an executable, which exposes API over gRPC or HTTP protocols. It accepts API calls and among other functions allows uploading a document, which will be parsed by an internal parser which is part of the Simila service, and indexing its data for search into the Simila DB. Another way to build an index is by using an external parser and inserting the index records using the Index API. Clients may use the search API for searching text over the built indexes.
+
+The Simila DB is a storage that is used by Simila to store its indexed data and for the vector search (TBD). Initially, we propose to use Postgres for the purposes, but integrations with other services like ElasticSearch are also may be implemented.
