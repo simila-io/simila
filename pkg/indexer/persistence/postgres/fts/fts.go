@@ -13,6 +13,10 @@ import (
 const (
 	createTsConfigUp = `
 create text search configuration public.simila (copy = pg_catalog.english);
+
+alter text search configuration simila
+	alter mapping for asciiword, asciihword, hword_asciipart, word, hword, hword_part
+	with spanish_stem, english_stem;
 `
 	createTsConfigDown = `
 drop text search configuration public.simila cascade;
@@ -29,6 +33,11 @@ drop index if exists "idx_index_record_segment_tsvector";
 alter table "index_record" drop column if exists "idx_index_record_segment_tsvector";
 `
 )
+
+// TODO: we can extend public.simila TS configuration with other dictionaries,
+// this will produce more lexems and help with search, but it will increase the
+// size of the "segment_tsvector", probably this should be made configurable on
+// customer basis.
 
 func createTsConfig(id string) *migrate.Migration {
 	return &migrate.Migration{
@@ -116,7 +125,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 		if len(args) > 0 {
 			sb.WriteString(" and ")
 		}
-		sb.WriteString(" index_record.segment_tsvector @@ websearch_to_tsquery('public.simila', ?) ")
+		sb.WriteString(" index_record.segment_tsvector @@ websearch_to_tsquery('simila', ?) ")
 		args = append(args, query.Query)
 	}
 
@@ -146,7 +155,7 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	// count
 	args = append(args, query.Query)
 	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('public.simila', $%d)) as score "+
+		"from (select %s index_record.*, ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('simila', $%d)) as score "+
 		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s) as r", distinct, len(args), where, orderBy), args...)
 	if err != nil {
@@ -159,8 +168,8 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	}
 	args = append(args, query.Offset, limit)
 	rows, err := q.QueryxContext(ctx, fmt.Sprintf("select %s index_record.*, "+
-		"ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('public.simila', $%d)) as score, "+
-		"ts_headline(index_record.segment, websearch_to_tsquery('public.simila', $%d), 'MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>') as matched_keywords "+
+		"ts_rank_cd(index_record.segment_tsvector, websearch_to_tsquery('simila', $%d)) as score, "+
+		"ts_headline(index_record.segment, websearch_to_tsquery('simila', $%d), 'MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>') as matched_keywords "+
 		"from index_record "+
 		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
 		distinct, len(args)-2, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
@@ -169,14 +178,31 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 	}
 
 	// results
-	res, err := persistence.ScanRowsQueryResultAndMap(rows, persistence.MapKeywordsToListFn("<<", ">>"))
+	fRes, err := persistence.ScanRowsQueryResult[ftsSearchQueryResultItem](rows)
 	if err != nil {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
 	}
+	res := toSearchQueryResultItem(fRes)
 	var nextID persistence.IndexRecordID
 	if len(res) > query.Limit {
 		nextID = persistence.IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
 		res = res[:query.Limit]
 	}
 	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
+}
+
+// includes SegmentTsVector that is specific
+// to FTS search only and is not needed by other modules
+type ftsSearchQueryResultItem struct {
+	persistence.SearchQueryResultItem
+	SegmentTsVector string `db:"segment_tsvector"`
+}
+
+func toSearchQueryResultItem(fRes []ftsSearchQueryResultItem) []persistence.SearchQueryResultItem {
+	res := make([]persistence.SearchQueryResultItem, len(fRes))
+	mapFn := persistence.MapKeywordsToListFn("<<", ">>")
+	for i, fr := range fRes {
+		res[i] = mapFn(fr.SearchQueryResultItem)
+	}
+	return res
 }

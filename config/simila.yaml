@@ -1,0 +1,19 @@
+{
+  "GrpcTransport": {
+    "Network": "tcp",
+    "Address": "",
+    "Port": 50051
+  },
+  "HttpPort": 8080,
+  "SearchEngine": "pgtrigram",
+  "DB": {
+    "Driver": "postgres",
+    "Host": "localhost",
+    "Port": "5432",
+    "Username": "postgres",
+    "Password": "postgres",
+    "DBName": "simila",
+    "SSLMode": "disable"
+  }
+}
+

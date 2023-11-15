@@ -493,14 +493,14 @@ components:
     FormatParam:
       in: query
       name: format
-      description:
+      description: ""
       required: false
       schema:
         type: string
     TagsParam:
       in: query
       name: tags
-      description:
+      description: ""
       required: false
       schema:
         $ref: '#/components/schemas/Tags'

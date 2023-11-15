@@ -18,8 +18,14 @@ To run Simila, you need at least two components: the Simila service and the Simi
 
 Semantic search capabilities are provided by integrating with an LLM model for calculating embeddings. These embeddings are then stored in the Simila database and being used for the semantic search.
 
+## Core concepts
+The Simila design and domain objects are described in the [core concepts](docs/concepts.md) section. It is recommended to read this section before starting to use Simila.
+
 ## API
-The Simila API is based on the [concepts](docs/concepts.md) and available over [gRPC](api/proto) and [HTTP](api/openapi/README.md) protocols.
+The Simila API is available over [gRPC](api/proto) and [HTTP](api/openapi/README.md) protocols.
+
+## Configuration
+The [configuration settings](docs/configuration.md) could be passed to Simila via configuration file `simila start --config simila.yaml` or via the environment variables starting with the `SIMILA_` prefix.
 
 ## How to run
 Here are some examples, how Simila can be run:

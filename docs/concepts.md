@@ -1,5 +1,5 @@
-# Simila concepts
-The page describes the objects' model and the concept that are used in Simila.
+# Core concepts
+The section describes the objects' model and the concepts that are used in Simila.
 
 ## Objects
 
@@ -50,7 +50,7 @@ A tag is a `<key:value>` pair where the `key` and the `value` are text values. T
 
 ## High-level design (in few words)
 Simila highl-level design is depicted in the following diagram:
-![](../assets/imgs/Simila-design.png)
+![](../assets/imgs/simila-design.png)
 
 There are two main components there - Simila service and the Simila DB. 
 

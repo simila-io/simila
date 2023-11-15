@@ -9,8 +9,8 @@ services:
     env_file:
       - docker-compose.env
     ports:
-      - 50052:50051
-      - 8081:8080
+      - 50051:50051
+      - 8080:8080
     healthcheck:
       test: [ "CMD", "/bin/grpc_health_probe", "-addr=:50051" ]
       interval: 10s
@@ -24,7 +24,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: simila
     ports:
-      - 5433:5432
+      - 5432:5432
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:

@@ -1,5 +1,7 @@
-## Run Simila
-### docker-compose locally
+## How to run
+The section describes how to run Simila quickly.
+
+### Docker-compose locally
 
 Use `make` to build the artifacts and run everything in the Docker:
 ```bash
@@ -11,20 +13,18 @@ Tail logs (optional):
 make compose-logs
 ```
 
-Use the API:
+Test API is up and running (optional):
 ```bash
-curl localhost:8081/v1/ping # http API
-grpcurl --plaintext localhost:50052 grpc.health.v1.Health/Check # grpc API 
+curl localhost:8080/v1/ping
 ```
 
-To Stop Simila run the command:
+To stop Simila run the command:
 ```bash
 make compose-down
 ```
 
-
 ### Compile from the source code and run it locally
-**NOTE**: you need `Golang`, `docker` and `make` to be installed
+**NOTE**: you need `Golang`, `docker` and `make` to be installed  
 
 Compile the `simila` and `scli` executables (they will be put into `build/` directory):
 ```bash
@@ -44,4 +44,9 @@ Start the Simila service:
 Connect to Simila service using `scli` command tool:
 ```bash
 ./build/scli 
+```
+
+To stop postgres:
+```bash
+make db-stop
 ```
