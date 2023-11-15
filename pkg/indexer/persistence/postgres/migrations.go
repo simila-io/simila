@@ -124,7 +124,7 @@ func migrateCommonDown(ctx context.Context, db *sql.DB) error {
 func migrateGroongaUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, groonga.Migrations()...)
+	migrs = append(migrs, groonga.Migrations(false)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -137,7 +137,7 @@ func migrateGroongaUp(ctx context.Context, db *sql.DB) error {
 func migrateGroongaDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, groonga.Migrations()...)
+	migrs = append(migrs, groonga.Migrations(true)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -152,7 +152,7 @@ func migrateGroongaDown(ctx context.Context, db *sql.DB) error {
 func migrateTrigramUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, trigram.Migrations()...)
+	migrs = append(migrs, trigram.Migrations(false)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -166,7 +166,7 @@ func migrateTrigramUp(ctx context.Context, db *sql.DB) error {
 func migrateTrigramDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, trigram.Migrations()...)
+	migrs = append(migrs, trigram.Migrations(true)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -181,7 +181,7 @@ func migrateTrigramDown(ctx context.Context, db *sql.DB) error {
 func migrateFtsUp(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, fts.Migrations()...)
+	migrs = append(migrs, fts.Migrations(false)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -195,7 +195,7 @@ func migrateFtsUp(ctx context.Context, db *sql.DB) error {
 func migrateFtsDown(ctx context.Context, db *sql.DB) error {
 	var migrs []*migrate.Migration
 	migrs = append(migrs, migrations()...)
-	migrs = append(migrs, fts.Migrations()...)
+	migrs = append(migrs, fts.Migrations(true)...)
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,
 	}
@@ -214,13 +214,13 @@ func rollbackOthers(ctx context.Context, db *sql.DB, currSearch SearchModuleName
 	migrate.SetIgnoreUnknown(true)
 	var migrs []*migrate.Migration
 	if currSearch != SearchModuleFts {
-		migrs = append(migrs, fts.Migrations()...)
+		migrs = append(migrs, fts.Migrations(true)...)
 	}
 	if currSearch != SearchModuleGroonga {
-		migrs = append(migrs, groonga.Migrations()...)
+		migrs = append(migrs, groonga.Migrations(true)...)
 	}
 	if currSearch != SearchModuleTrigram {
-		migrs = append(migrs, trigram.Migrations()...)
+		migrs = append(migrs, trigram.Migrations(true)...)
 	}
 	mms := migrate.MemoryMigrationSource{
 		Migrations: migrs,

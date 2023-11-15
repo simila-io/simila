@@ -48,31 +48,37 @@ alter table "index_record" drop column if exists "segment_tsvector";
 // size of the "segment_tsvector", probably this should be made configurable on
 // customer basis.
 
-func createTsConfig(id string) *migrate.Migration {
-	return &migrate.Migration{
+func createTsConfig(id string, rollback bool) *migrate.Migration {
+	m := &migrate.Migration{
 		Id:                     id,
-		Up:                     []string{createTsConfigUp},
 		Down:                   []string{createTsConfigDown},
-		DisableTransactionUp:   true,
 		DisableTransactionDown: true,
 	}
+	if !rollback {
+		m.Up = []string{createTsConfigUp}
+		m.DisableTransactionUp = true
+	}
+	return m
 }
 
-func createSegmentTsVector(id string) *migrate.Migration {
-	return &migrate.Migration{
+func createSegmentTsVector(id string, rollback bool) *migrate.Migration {
+	m := &migrate.Migration{
 		Id:   id,
-		Up:   []string{createSegmentTsVectorUp},
 		Down: []string{createSegmentTsVectorDown},
 	}
+	if !rollback {
+		m.Up = []string{createSegmentTsVectorUp}
+	}
+	return m
 }
 
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the postgres built-in  full-text search
 // module to work, the module migration IDs range is [3000-3999]
-func Migrations() []*migrate.Migration {
+func Migrations(rollback bool) []*migrate.Migration {
 	return []*migrate.Migration{
-		createTsConfig("3000"),
-		createSegmentTsVector("3001"),
+		createTsConfig("3000", rollback),
+		createSegmentTsVector("3001", rollback),
 	}
 }
 

@@ -23,29 +23,35 @@ drop index if exists "idx_index_record_segment_trgm";
 `
 )
 
-func createExtension(id string) *migrate.Migration {
-	return &migrate.Migration{
-		Id:                   id,
-		Up:                   []string{createExtensionUp},
-		DisableTransactionUp: true,
+func createExtension(id string, rollback bool) *migrate.Migration {
+	m := &migrate.Migration{
+		Id: id,
 	}
+	if !rollback {
+		m.Up = []string{createExtensionUp}
+		m.DisableTransactionUp = true
+	}
+	return m
 }
 
-func createSegmentIndex(id string) *migrate.Migration {
-	return &migrate.Migration{
+func createSegmentIndex(id string, rollback bool) *migrate.Migration {
+	m := &migrate.Migration{
 		Id:   id,
-		Up:   []string{createSegmentIndexUp},
 		Down: []string{createSegmentIndexDown},
 	}
+	if !rollback {
+		m.Up = []string{createSegmentIndexUp}
+	}
+	return m
 }
 
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the "trigram" search module to work,
 // the "trigram" module migration IDs range is [2000-2999]
-func Migrations() []*migrate.Migration {
+func Migrations(rollback bool) []*migrate.Migration {
 	return []*migrate.Migration{
-		createExtension("2000"),
-		createSegmentIndex("2001"),
+		createExtension("2000", rollback),
+		createSegmentIndex("2001", rollback),
 	}
 }
 

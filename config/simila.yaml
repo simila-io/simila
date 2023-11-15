@@ -5,7 +5,7 @@
     "Port": 50051
   },
   "HttpPort": 8080,
-  "SearchEngine": "pgtrigram",
+  "SearchEngine": "pgfts",
   "DB": {
     "Driver": "postgres",
     "Host": "localhost",
