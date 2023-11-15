@@ -24,6 +24,13 @@ The Simila design and domain objects are described in the [core concepts](docs/c
 ## API
 The Simila API is available over [gRPC](api/proto) and [HTTP](api/openapi/README.md) protocols.
 
+Calling APIs example:
+
+```bash
+curl localhost:8080/v1/ping # http API
+grpcurl --plaintext localhost:50051 grpc.health.v1.Health/Check # grpc API 
+```
+
 ## Configuration
 The [configuration settings](docs/configuration.md) could be passed to Simila via configuration file `simila start --config simila.yaml` or via the environment variables starting with the `SIMILA_` prefix.
 
