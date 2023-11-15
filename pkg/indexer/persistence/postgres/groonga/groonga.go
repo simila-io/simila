@@ -52,8 +52,8 @@ func Migrations() []*migrate.Migration {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the "pgroonga" postgres extension.
-// Queries must be formed in accordance with the `websearch_to_tsquery()` query syntax,
-// see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
+// Queries must be formed in accordance with the "pgroonga" query syntax,
+// see https://pgroonga.github.io/reference/operators/query-v2.html.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
 		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)

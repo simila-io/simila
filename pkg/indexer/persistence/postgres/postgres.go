@@ -34,6 +34,9 @@ func GetDb(ctx context.Context, dsName string, search SearchModuleName) (*Db, er
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to the database: %w", err)
 	}
+	if err = rollbackOthers(ctx, db.DB, search); err != nil {
+		return nil, fmt.Errorf("rollback failed: %w", err)
+	}
 	switch search {
 	case SearchModuleNone:
 		return getDefaultDb(ctx, db)

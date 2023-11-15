@@ -19,7 +19,16 @@ alter text search configuration simila
 	with spanish_stem, english_stem;
 `
 	createTsConfigDown = `
-drop text search configuration public.simila cascade;
+do $$
+begin
+    if exists(
+		select "cfgname" from "pg_ts_config" where "cfgname" = 'simila'
+	)
+    then
+		drop text search configuration public.simila cascade;
+    end if;
+end
+$$;
 `
 	createSegmentTsVectorUp = ` 
 alter table "index_record"
@@ -30,7 +39,7 @@ create index if not exists "idx_index_record_segment_tsvector" on "index_record"
 	createSegmentTsVectorDown = ` 
 drop index if exists "idx_index_record_segment_tsvector";
 
-alter table "index_record" drop column if exists "idx_index_record_segment_tsvector";
+alter table "index_record" drop column if exists "segment_tsvector";
 `
 )
 
@@ -69,7 +78,7 @@ func Migrations() []*migrate.Migration {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the postgres built-in full-text search.
-// Queries must be formed in accordance with the `websearch_to_tsquery()` syntax,
+// Queries must be formed in accordance with the `websearch_to_tsquery()` query syntax,
 // see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {

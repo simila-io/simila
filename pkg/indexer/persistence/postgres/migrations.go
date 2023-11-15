@@ -25,10 +25,6 @@ import (
 
 const (
 	initSchemaUp = `
-drop table if exists "index_record";
-drop table if exists "index";
-drop table if exists "format";
-
 create table if not exists "format"
 (
     "id"          varchar(255)             not null,
@@ -206,5 +202,32 @@ func migrateFtsDown(ctx context.Context, db *sql.DB) error {
 	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
 		return err
 	}
+	return nil
+}
+
+// rollback NOT currSearch module migrations,
+// this will leave only "common" migrations and
+// will allow switching between search modules,
+// if we set migrate.SetIgnoreUnknown(true)
+
+func rollbackOthers(ctx context.Context, db *sql.DB, currSearch SearchModuleName) error {
+	migrate.SetIgnoreUnknown(true)
+	var migrs []*migrate.Migration
+	if currSearch != SearchModuleFts {
+		migrs = append(migrs, fts.Migrations()...)
+	}
+	if currSearch != SearchModuleGroonga {
+		migrs = append(migrs, groonga.Migrations()...)
+	}
+	if currSearch != SearchModuleTrigram {
+		migrs = append(migrs, trigram.Migrations()...)
+	}
+	mms := migrate.MemoryMigrationSource{
+		Migrations: migrs,
+	}
+	if _, err := migrate.ExecContext(ctx, db, "postgres", mms, migrate.Down); err != nil {
+		return err
+	}
+	migrate.SetIgnoreUnknown(false)
 	return nil
 }

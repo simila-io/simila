@@ -60,8 +60,8 @@ func SessionParams() map[string]any {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the "pg_trgm" postgres extension.
-// Queries are just text, no conditional expressions are supported for now,
-// the whole segment of text is matched against the whole query text using `word similarity`,
+// Queries are just text, no expressions are supported for now, the whole
+// segment of text is matched against the whole query text using `trigram word similarity`,
 // see https://www.postgresql.org/docs/current/pgtrgm.html.
 func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
 	if len(query.Query) == 0 {
@@ -188,12 +188,15 @@ func mapKeywordsToListFn(query string) func(item persistence.SearchQueryResultIt
 		wordMap[strings.Trim(strings.ToLower(w), trimSet)] = struct{}{}
 	}
 	return func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
+		item.MatchedKeywordsList = make([]string, 0)
 		for _, w := range strings.Fields(item.Segment) {
 			if _, ok := wordMap[strings.Trim(strings.ToLower(w), trimSet)]; ok {
 				item.MatchedKeywordsList = append(item.MatchedKeywordsList, w)
 			}
 		}
-		item.MatchedKeywordsList = strutil.RemoveDups(item.MatchedKeywordsList)
+		if len(item.MatchedKeywordsList) > 0 {
+			item.MatchedKeywordsList = strutil.RemoveDups(item.MatchedKeywordsList)
+		}
 		return item
 	}
 }

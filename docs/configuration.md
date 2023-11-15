@@ -12,10 +12,16 @@ This parameter specifies on which port the HTTP API is listened
 ### SearchEngine
 This parameter defines which search engine, behind Simila API, is used for indexing and search. At the moment Simila supports Postgres >= v15 only in 3 different modes: `pgroonga`, `pgtrigram` and `pgfts`.
 
-**NOTE:** In order to use `pgroonga` and `pgtrigram` modes the `pgroonga` and `pg_tgrm` Postgres extensions must be installed correspondingly.
+In order to use `pgroonga` and `pgtrigram` modes the `pgroonga` and `pg_tgrm` Postgres extensions must be installed accordingly.
+Depending on the chosen mode the query syntax used in search API is different:
+
+- `pgroonga`: see https://pgroonga.github.io/reference/operators/query-v2.html
+- `pgfts`: see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES for `websearch_to_tsquery()`
+- `pgtrigram`: no query language, the query text is matched against the stored index using the `trigram word similarity` criteria,
+
 
 ### DB
-This group of settings specifies the Simila DB settings. At the moment only Postgres >= v15 is supported.
+This group of settings specifies the Simila DB settings. At the moment only Postgres >= v15 is supported. The `SSLMode` param can be set to `disable` or `require` depending on the environment and desired SSL mode (localhost, RDS, etc.)
 
 ## Examples
 

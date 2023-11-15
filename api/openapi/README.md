@@ -1,5 +1,5 @@
 # Simila API
-This folder contains [simila.yaml](v1/simila.yaml) file in [OpenAPI(Swagger)](https://www.openapis.org/) format for Simila service.
+This folder contains [simila.yaml](v1/simila.yaml) file in [OpenAPI](https://www.openapis.org/) format for Simila service.
 
 ## Conventions
 Whoever makes changes in the public API should follow the conventions described here.
