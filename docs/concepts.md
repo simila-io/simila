@@ -23,7 +23,7 @@ Dimension is a scalar value, which helps to identify the position of text in a d
 A Vector is a set of scalar values of every dimension for a basis. For example, for a `pdf` document the text “Hello world!” in the basis `{page, paragraph}` may be `{1, 1}`, which means that the text resides on page one in the first paragraph of the document.
 
 ### Index
-An index is a form of data transformed from the original document, and it's optimized for the full-text search. Every index is built for a document in the specific format, which identifies the [bais](#basis) of the vectors in the index records. Simila stores the index in its dedicated database. Each index contains a list of records associated with a unique index ID. Each index record stores the searchable text and the vector of the text based on the document format.
+An index is a form of data transformed from the original document, and it's optimized for the full-text search. Every index is built for a document in the specific format, which identifies the [basis](#basis) of the vectors in the index records. Simila stores the index in its dedicated database. Each index contains a list of records associated with a unique index ID. Each index record stores the searchable text and the vector of the text based on the document format.
 
 For instance, an mp3-encoded file contains the sound of a voice, which may be transcribed and represented as text spoken in the mp3 recording. The index will store the text available for search for the `mp3` format. Search results may be returned in the format: 'Hello world!' is spoken at 00:30 in the recording. 'Hello world' is the searchable text, and the timepoint '00:30' serves as the reference point (vector) where the text is spoken.
 
