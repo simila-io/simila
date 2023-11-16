@@ -19,7 +19,7 @@ jobs:
             scli_artifact: scli
             scli_asset: scli-macos-amd64
 
-          - os: macos-13-large
+          - os: macos-13-xlarge
             scli_artifact: scli
             scli_asset: scli-macos-arm64
     steps:
