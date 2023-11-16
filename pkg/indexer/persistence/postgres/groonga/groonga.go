@@ -47,8 +47,6 @@ func createSegmentIndex(id string, rollback bool) *migrate.Migration {
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the "groonga" search module to work,
 // the "groonga" module migration IDs range is [1000-1999].
-// Queries must be formed in accordance with the pgroonga query operator syntax,
-// see https://pgroonga.github.io/reference/operators/query-v2.html
 func Migrations(rollback bool) []*migrate.Migration {
 	return []*migrate.Migration{
 		createExtension("1000", rollback),

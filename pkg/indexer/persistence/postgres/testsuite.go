@@ -24,20 +24,14 @@ func newPqTestSuite(pgExt SearchModuleName) pgTestSuite {
 }
 
 func (ts *pgTestSuite) SetupSuite() {
-	ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelFn()
-
 	var err error
 	var dbCont persistence.DbContainer
 
 	switch ts.sModule {
-	case SearchModuleGroonga:
-		dbCont, err = persistence.NewPgDbContainer(ctx,
-			"groonga/pgroonga:latest-debian-16", persistence.WithDbName("simila_test"))
-		assert.Nil(ts.T(), err)
-	case SearchModuleNone, SearchModuleTrigram, SearchModuleFts:
-		dbCont, err = persistence.NewPgDbContainer(ctx,
-			"postgres:16-alpine", persistence.WithDbName("simila_test"))
+	case SearchModuleNone, SearchModuleGroonga, SearchModuleTrigram, SearchModuleFts:
+		ctx, cancelFn := context.WithTimeout(context.Background(), time.Minute)
+		defer cancelFn()
+		dbCont, err = persistence.NewPgDbContainer(ctx, "simila/similadb:latest", persistence.WithDbName("simila_test"))
 		assert.Nil(ts.T(), err)
 	default:
 		err = fmt.Errorf("unsupported postgres search module: %s", ts.sModule)

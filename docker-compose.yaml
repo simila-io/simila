@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   engine:
-    image: simila:latest
+    image: simila/simila:latest
     restart: always
     depends_on:
       db:
@@ -17,7 +17,7 @@ services:
       timeout: 10s
       retries: 3
   db:
-    image: groonga/pgroonga:latest-debian-16
+    image: simila/similadb:latest
     restart: always
     environment:
       POSTGRES_USER: postgres
