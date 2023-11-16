@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+function error {
+    msg=$1
+    echo "Error: ${msg}"
+    exit 1
+}
+
+################# Main #################
+CMD="scli"
+DEST="/usr/local/bin"
+RELEASE="v0.71.0"
+
+while [[ "$1" != "" ]]; do
+    case $1 in
+        -r|--release)
+            shift
+            RELEASE=$1
+            ;;
+        -d|--dest)
+            shift
+            DEST=$1
+            ;;
+        -h|--help)
+            cat <<EOT
+
+USAGE: install [options]
+
+    install downloads the 'scli' binary (simila client) and copies it to the specified place
+
+OPTIONS:
+    -d, --dest <dir>    allows to specify the destination where the command
+                        will be copied. Default value is '/usr/local/bin'
+    -r, --release <ver> specifies the release version. The version must be
+                        in the form of vX.Y.Z
+    -h, --help          prints the help
+
+EOT
+            exit 0
+            ;;
+         *)
+            error "Unknown argument $1 passed! Try to run 'install --help' ..."
+            ;;
+    esac
+    shift
+done
+
+OS=$(uname)
+if [[ "${OS}" == "Linux" ]]; then
+    OS="linux"
+elif [[ "${OS}" == "Darwin" ]]; then
+    OS="macos"
+else
+    error "Platform '${OS}' is not supported!"
+fi
+
+ARCH=$(uname -m)
+if [[ "$ARCH" != "amd64" ]] && [[ "$ARCH" != "arm64" ]]; then
+    error "Architecture '${ARCH}' is not supported!"
+fi
+
+if [ ! -d "${DEST}" ]; then
+    echo "There is no dir '${DEST}', trying to create it ..."
+    mkdir ${DEST}
+    if [[ $? -ne 0 ]]; then
+        error "Could not create '${DEST}', please check permissions"
+    fi
+fi
+
+cd ${DEST}
+if [[ $? -ne 0 ]]; then
+    error "Could not change dir to '${DEST}', please check permissions and whether the dir exists"
+fi
+
+DEST=$(pwd)
+URL=https://github.com/simila-io/simila/releases/download/${RELEASE}/${CMD}-${OS}-${ARCH}
+echo "Downloading from ${URL} to ${DEST}/${CMD} ..."
+
+curl -sfL ${URL} -o ${CMD}
+if [[ $? -ne 0 ]]; then
+    error "Failed downloading '${CMD}' to '${DEST}', please check options and '${DEST}' permissions"
+fi
+
+chmod +x ${CMD}
+if [[ $? -ne 0 ]]; then
+    error "Could not make '${DEST}/${CMD}' executable, please check permissions"
+fi
+echo "Done! Try running '${DEST}/${CMD} --help'"

@@ -31,6 +31,15 @@ curl localhost:8080/v1/ping # http API
 grpcurl --plaintext localhost:50051 grpc.health.v1.Health/Check # grpc API 
 ```
 
+## CLI
+The Simila service has its own CLI client called `scli`.
+
+Install and run the CLI example:
+```bash
+curl https://raw.githubusercontent.com/simila-io/simila/main/install-cli | bash -s -- -d /tmp # install `scli` client
+/tmp/scli --help # show `scli` help
+```
+
 ## Configuration
 The [configuration settings](docs/configuration.md) could be passed to Simila via configuration file `simila start --config simila.yaml` or via the environment variables starting with the `SIMILA_` prefix.
 
