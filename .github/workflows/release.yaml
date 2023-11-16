@@ -1,0 +1,44 @@
+name: release
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            scli_artifact: scli
+            scli_asset: scli-linux-amd64
+
+          - os: macos-13
+            scli_artifact: scli
+            scli_asset: scli-macos-amd64
+
+          - os: macos-13-large
+            scli_artifact: scli
+            scli_asset: scli-macos-arm64
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v4
+        with:
+          go-version-file: go.mod
+
+      - name: Run build
+        run: make build
+
+      - name: Upload SCli binary to release
+        uses: svenstaro/upload-release-action@v3
+        with:
+          repo_token: ${{ secrets.BUILD_TOKEN }}
+          file: build/${{ matrix.scli_artifact }}
+          asset_name: ${{ matrix.scli_asset }}
+          overwrite: true
+          tag: ${{ github.ref }}
