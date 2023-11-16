@@ -35,7 +35,7 @@ jobs:
         run: make build
 
       - name: Upload SCli binary to release
-        uses: svenstaro/upload-release-action@v3
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.BUILD_TOKEN }}
           file: build/${{ matrix.scli_artifact }}
