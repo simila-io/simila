@@ -188,15 +188,16 @@ func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.Search
 }
 
 func mapKeywordsToListFn(query string) func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
-	trimSet := "!@#$%^&*(){}[]|:\".,?"
+	trimSet := "!@#$%^&*(){}[]|;:\"'`<>.,?"
 	wordMap := make(map[string]struct{})
 	for _, w := range strings.Fields(query) {
-		wordMap[strings.Trim(strings.ToLower(w), trimSet)] = struct{}{}
+		wordMap[strings.ToLower(strings.Trim(w, trimSet))] = struct{}{}
 	}
 	return func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {
 		item.MatchedKeywordsList = make([]string, 0)
 		for _, w := range strings.Fields(item.Segment) {
-			if _, ok := wordMap[strings.Trim(strings.ToLower(w), trimSet)]; ok {
+			w = strings.Trim(w, trimSet)
+			if _, ok := wordMap[strings.ToLower(w)]; ok {
 				item.MatchedKeywordsList = append(item.MatchedKeywordsList, w)
 			}
 		}

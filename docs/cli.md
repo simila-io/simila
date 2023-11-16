@@ -12,7 +12,7 @@ search <params> - run the search request across known indexes
 
 ### Show description of a command
 
-```
+```bash
 localhost:50051 > help search
 search <params> - returns the search results. It accepts the following params:
 
@@ -27,17 +27,17 @@ search <params> - returns the search results. It accepts the following params:
 ### Execute a command
 
 ```bash
-localhost:50051 > search text="lord OR honest" limit=10 as-table=true
-Score  IdxId     Keywords       Segment                                                                
-0....  test.txt  [lord]           EMILIA. [Within.] My lord, my lord! What, ho! my lord, my lord!      
-0....  test.txt  [LORD lord]      LORD. Thou art a lord, and nothing but a lord.                       
-0....  test.txt  [LORD lord]      FIRST LORD. It is the Count Rousillon, my good lord,                 
-0....  test.txt  [LORD lord]      FIRST LORD. O my sweet lord, that you will stay behind us!           
-0....  test.txt  [LORD lord]      SECOND LORD. Good my lord,                                           
-0....  test.txt  [LORD lord]      SECOND LORD. Nay, good my lord, put him to't; let him have his way.  
-0....  test.txt  [LORD lord]      SECOND LORD. On my life, my lord, a bubble.                          
-0....  test.txt  [LORD lord]      SECOND LORD. Believe it, my lord, in mine own direct knowledge,      
-0....  test.txt  [LORD lord]      FIRST LORD. You do not know him, my lord, as we do. Certain it is    
-0....  test.txt  [LORD honest]    FIRST LORD. But you say she's honest.                                
-Total:  3250
+localhost:50051 > search text="lord sir honest" limit=10 as-table=true
+Score  IdxId     Keywords       Segment                                                               
+0.75   test.txt  [honest lord]    KATHARINE. I thank you, honest lord. Remember me                    
+0.75   test.txt  [Honest lord]    PROSPERO.  [Aside]  Honest lord,                                    
+0.75   test.txt  [honest lord]      Poor honest lord, brought low by his own heart,                   
+0.63   test.txt  [Honest lord]    Pol. Honest, my lord?                                               
+0.63   test.txt  [Honest lord]    IAGO. Honest, my lord?                                              
+0.62   test.txt  [LORD Sir]       SECOND LORD. Sir, his wife, some two months since, fled from his    
+0.62   test.txt  [LORD Sir]       FIRST LORD. Sir, I would advise you to shift a shirt; the violence  
+0.62   test.txt  [LORD Sir]       FIRST LORD. Sir, as I told you always, her beauty and her brain go  
+0.57   test.txt  [lord honest]      How far hence is thy lord, mine honest fellow?                    
+0.56   test.txt  [Lord]           CLOWN. O Lord, sir!-There's a simple putting off. More, more, a     
+Total:  3656
 ```
