@@ -43,13 +43,14 @@ Here are some examples, how Simila can be run:
 ## CLI
 The Simila service has its own CLI client called `scli`.
 
-Install and run the CLI example:
+Install and run the CLI:
 
 ```bash
-curl https://raw.githubusercontent.com/simila-io/simila/main/install-cli | bash -s -- -d /tmp # install `scli` client
-/tmp/scli --help # show `scli` help
+curl -s https://raw.githubusercontent.com/simila-io/simila/main/install-cli | bash -s -- -d /tmp # install `scli` client
+/tmp/scli --addr localhost:50051 # connect to simila service
 ```
+
+For more details please check [this](docs/cli.md) section.
 
 ## License
 Apache License 2.0, see [LICENSE](LICENSE).
-
