@@ -9,7 +9,7 @@ function error {
 ################# Main #################
 CMD="scli"
 DEST="/usr/local/bin"
-RELEASE="v0.71.0"
+RELEASE="v0.74.0"
 
 while [[ "$1" != "" ]]; do
     case $1 in
