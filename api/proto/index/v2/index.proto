@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+package index.v2;
+option go_package = "./index/v2;index";
+
+// Service provides an external API for managing the index records
+service Service {
+  // Create allows to new records for a search.
+  rpc Create(CreateRecordsRequest) returns (CreateRecordsResult);
+  // Create allows to create a new records, streaming the records data in the request
+  rpc CreateWithStreamData(stream CreateIndexStreamRequest) returns (CreateRecordsResult);
+  // DeleteNode allows to delete a Node and all its children identified by the path provided
+  rpc DeleteNode(Path) returns (google.protobuf.Empty);
+  // ListNodes returns all known children for the Path provided
+  rpc ListNodes(Path) returns (Nodes);
+  // Patch allows to insert, update or delete an index's records
+  rpc PatchRecords(PatchRecordsRequest) returns (PatchRecordsResult);
+  // ListRecords returns list of records for a path associated with it
+  rpc ListRecords(ListRequest) returns (ListRecordsResult);
+  // Search runs the search across all indexes by the specified query. Result will
+  // be ordered by the ranks for the request
+  rpc Search(SearchRecordsRequest) returns (SearchRecordsResult);
+}
+
+// Path structure describes the list of nodes which identify a final node in the object tree.
+message Path {
+  // path is the nodes names separated by '/' like in the computer filesystem
+  string path = 1;
+}
+
+enum NodeType {
+  FOLDER = 0;
+  DOCUMENT = 1;
+}
+
+message Node {
+  // name is the identifier of the node on the level of the tree. Name must be unique among the children of the same
+  // node.
+  string name = 1;
+  // type of the node
+  NodeType type = 2;
+  // tags defines the tags associated with the object
+  map<string, string> tags = 3;
+}
+
+message Nodes {
+  repeated Node nodes = 1;
+}
+
+// CreateIndexRequest allows to create a new index
+message CreateRecordsRequest {
+  // path contains the path to a node the all records will be associated with. If one or several
+  // nodes in the path do not exist, they will be created automatically with folder type.
+  // path cannot contain "document" nodes, but last one. They type
+  string path = 1;
+  // nodeType contains the node type the records will be added to if it will be created during the call.
+  // This is the last name in the path and if it doesn't exist, it will be created with the type
+  optional NodeType nodeType = 2;
+  // tags associated with the new node. If it is empty, no changes in the tags for the node.
+  map<string, string> tags = 3;
+  // parser, which will be used for the document body. Actually it is the format name
+  optional string parser = 4;
+  // document contains the binary data for the parser provided. It may be empty
+  optional bytes document = 5;
+  // records contains the list of records that can be added additionally to the document
+  repeated Record records = 6;
+  // rankMultiplier must be >= 1.0 and defines the priority of the records if the parser is used or no this field in the records list
+  float rankMultiplier = 7;
+}
+
+// CreateIndexStreamRequest wraps CreateIndexRequest OR a chunk of body stream
+message CreateIndexStreamRequest {
+  // CreateRecordsRequest must be in the first packet of the gRPC stream
+  CreateRecordsRequest meta = 1;
+  // data is the body data, may start from the first packet of the stream
+  bytes data = 2;
+}
+
+// CreateRecordsResult describes the result of the Create call
+message CreateRecordsResult {
+  Nodes nodesCreated = 1;
+  int64 recordsCreated = 2;
+}
+
+// Record represents an index record
+message Record {
+  // id of the record within the node. This value is created by parser or during the records insertion.
+  // it is used for the updating records or deleting them within a node
+  string id = 1;
+  // segment contains the searchable text for the record
+  string segment = 2;
+  // vector is the list of the byte values (stringified) ordered according the basis fields definition
+  bytes vector = 3;
+  // format of the record
+  string format = 4;
+  // rankMultiplier must be >= 1.0 and defines the priority of the records if the parser is used or no this field in the records list
+  float rankMultiplier = 5;
+}
+
+// ListRequest describes input parameters for the list operation
+message ListRequest {
+  // path to the node, for which records to be listed
+  string path = 1;
+  // format contains filter for specific records format
+  optional string format = 2;
+  optional string pageId = 3;
+  optional google.protobuf.Timestamp createdAfter = 4;
+  optional google.protobuf.Timestamp createdBefore = 5;
+  optional int64 limit = 6;
+}
+
+message ListRecordsResult {
+  repeated Record records = 1;
+  optional string nextPageId = 2;
+  int64 total = 3;
+}
+
+// PatchRecordsRequest describes input parameters for index records patch operation.
+message PatchRecordsRequest {
+  // path is the path to the node for the patch request
+  string path = 1;
+  // upsertRecords contains the list of records that should be inserted or updated
+  repeated Record upsertRecords = 2;
+  // deleteRecords contains the list of records that should be deleted
+  repeated Record deleteRecords = 3;
+}
+
+// PatchRecordsResult describes the result of the patch index's records operation
+message PatchRecordsResult {
+  int64 upserted = 1;
+  int64 deleted = 2;
+}
+
+// SearchRecordsRequest describes input parameters for the Search over indexes operation.
+message SearchRecordsRequest {
+  string text = 1;
+  map<string, string> tags = 2;
+  // path contains the path where to run the search. It will be run against all the records in the path sub-tree
+  string path = 3;
+  optional string pageId = 4;
+  // limit specifies the maximum number of records in the result set
+  optional int64 limit = 5;
+}
+
+// SearchRecordsResultItem describes search records result item
+message SearchRecordsResultItem {
+  string path = 1;
+  Record record = 2;
+  repeated string MatchedKeywords = 3;
+  optional float score = 4;
+}
+
+// SearchRecordsResult contains the result of a search operation
+message SearchRecordsResult {
+  repeated SearchRecordsResultItem items = 1;
+  optional string nextPageId = 2;
+  int64 total = 3;
+}
