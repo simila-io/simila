@@ -140,9 +140,12 @@ message SearchRecordsRequest {
   map<string, string> tags = 2;
   // path contains the path where to run the search. It will be run against all the records in the path sub-tree
   string path = 3;
-  optional string pageId = 4;
+  // strict flag limits the search by the path node only. So the search will not be run in the childrens, but in
+  // th node index records only
+  optional bool strict = 4;
+  optional string pageId = 5;
   // limit specifies the maximum number of records in the result set
-  optional int64 limit = 5;
+  optional int64 limit = 6;
 }
 
 // SearchRecordsResultItem describes search records result item
