@@ -55,15 +55,40 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 	scanner := bufio.NewScanner(body)
 	var recs []persistence.IndexRecord
 
-	line := 0
-	for scanner.Scan() {
-		line++
-		sgmnt := scanner.Text()
-		trimmed := strings.Trim(sgmnt, " \t\n\v\f\r\x85\xA0")
-		if len(trimmed) == 0 {
-			continue
+	start := ""
+	paragraph := 0
+	for {
+		var sb strings.Builder
+		sb.WriteString(start)
+		start = ""
+		for scanner.Scan() {
+			ln := scanner.Text()
+			trimmed := strings.Trim(ln, " \t\n\v\f\r\x85\xA0")
+			if len(trimmed) == 0 {
+				// end of paragraph?
+				if sb.Len() > 0 {
+					break
+				}
+				continue
+			}
+			sb.WriteString(" ")
+			sb.WriteString(trimmed)
+			if sb.Len() > 2048 {
+				s := sb.String()
+				sb.Reset()
+				idx := strings.LastIndex(s, ".")
+				if idx > -1 {
+					start = s[idx+1:]
+					s = s[:idx+1]
+				}
+				sb.WriteString(s)
+			}
 		}
-		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", line), Segment: sgmnt})
+		if sb.Len() == 0 {
+			break
+		}
+		paragraph++
+		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", paragraph), Segment: sb.String()})
 		if len(recs) >= 100 {
 			if err := mtx.UpsertIndexRecords(recs...); err != nil {
 				return 0, err
@@ -78,7 +103,7 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 		}
 	}
 
-	return int64(line), nil
+	return int64(paragraph), nil
 }
 
 func (tp *txtParser) String() string {
