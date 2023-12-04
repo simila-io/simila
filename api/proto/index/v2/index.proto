@@ -143,7 +143,7 @@ message SearchRecordsRequest {
   // strict flag limits the search by the path node only. So the search will not be run in the childrens, but in
   // th node index records only
   optional bool strict = 4;
-  optional string pageId = 5;
+  optional int64 offset = 5;
   // limit specifies the maximum number of records in the result set
   optional int64 limit = 6;
 }
@@ -159,6 +159,5 @@ message SearchRecordsResultItem {
 // SearchRecordsResult contains the result of a search operation
 message SearchRecordsResult {
   repeated SearchRecordsResultItem items = 1;
-  optional string nextPageId = 2;
-  int64 total = 3;
+  int64 total = 2;
 }
