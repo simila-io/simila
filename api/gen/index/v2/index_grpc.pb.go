@@ -20,40 +20,34 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Service_Create_FullMethodName               = "/index.v1.Service/Create"
-	Service_CreateWithStreamData_FullMethodName = "/index.v1.Service/CreateWithStreamData"
-	Service_Delete_FullMethodName               = "/index.v1.Service/Delete"
-	Service_Get_FullMethodName                  = "/index.v1.Service/Get"
-	Service_Put_FullMethodName                  = "/index.v1.Service/Put"
-	Service_List_FullMethodName                 = "/index.v1.Service/List"
-	Service_PatchRecords_FullMethodName         = "/index.v1.Service/PatchRecords"
-	Service_ListRecords_FullMethodName          = "/index.v1.Service/ListRecords"
-	Service_SearchRecords_FullMethodName        = "/index.v1.Service/SearchRecords"
+	Service_Create_FullMethodName               = "/index.v2.Service/Create"
+	Service_CreateWithStreamData_FullMethodName = "/index.v2.Service/CreateWithStreamData"
+	Service_DeleteNode_FullMethodName           = "/index.v2.Service/DeleteNode"
+	Service_ListNodes_FullMethodName            = "/index.v2.Service/ListNodes"
+	Service_PatchRecords_FullMethodName         = "/index.v2.Service/PatchRecords"
+	Service_ListRecords_FullMethodName          = "/index.v2.Service/ListRecords"
+	Service_Search_FullMethodName               = "/index.v2.Service/Search"
 )
 
 // ServiceClient is the client API for Service service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServiceClient interface {
-	// Create allows to create a new index.
-	Create(ctx context.Context, in *CreateIndexRequest, opts ...grpc.CallOption) (*Index, error)
-	// Create allows to create a new index, streaming the records data in the request
+	// Create allows to create the new records for a search.
+	Create(ctx context.Context, in *CreateRecordsRequest, opts ...grpc.CallOption) (*CreateRecordsResult, error)
+	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(ctx context.Context, opts ...grpc.CallOption) (Service_CreateWithStreamDataClient, error)
-	// Delete allows to remove an index by its id
-	Delete(ctx context.Context, in *Id, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// Get returns information about the index
-	Get(ctx context.Context, in *Id, opts ...grpc.CallOption) (*Index, error)
-	// Put allows to update the index tags
-	Put(ctx context.Context, in *Index, opts ...grpc.CallOption) (*Index, error)
-	// List returns list of known indexes
-	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*Indexes, error)
-	// PatchRecords allows to insert, update or delete an index's records
+	// DeleteNode allows to delete a Node and all its children identified by the path provided
+	DeleteNode(ctx context.Context, in *Path, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ListNodes returns all known children for the Path provided
+	ListNodes(ctx context.Context, in *Path, opts ...grpc.CallOption) (*Nodes, error)
+	// Patch allows to insert, update or delete an index's records
 	PatchRecords(ctx context.Context, in *PatchRecordsRequest, opts ...grpc.CallOption) (*PatchRecordsResult, error)
-	// ListRecords returns list of records for an index
-	ListRecords(ctx context.Context, in *ListRecordsRequest, opts ...grpc.CallOption) (*ListRecordsResult, error)
-	// SearchRecords runs the search across all indexes by the specified query. Result will
-	// be ordered by indexID:recordID order
-	SearchRecords(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResult, error)
+	// ListRecords returns list of records for a path associated with it
+	ListRecords(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListRecordsResult, error)
+	// Search runs the search across all the index records matching the query. Result will
+	// be ordered by the ranks for the request.
+	Search(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResult, error)
 }
 
 type serviceClient struct {
@@ -64,8 +58,8 @@ func NewServiceClient(cc grpc.ClientConnInterface) ServiceClient {
 	return &serviceClient{cc}
 }
 
-func (c *serviceClient) Create(ctx context.Context, in *CreateIndexRequest, opts ...grpc.CallOption) (*Index, error) {
-	out := new(Index)
+func (c *serviceClient) Create(ctx context.Context, in *CreateRecordsRequest, opts ...grpc.CallOption) (*CreateRecordsResult, error) {
+	out := new(CreateRecordsResult)
 	err := c.cc.Invoke(ctx, Service_Create_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -84,7 +78,7 @@ func (c *serviceClient) CreateWithStreamData(ctx context.Context, opts ...grpc.C
 
 type Service_CreateWithStreamDataClient interface {
 	Send(*CreateIndexStreamRequest) error
-	CloseAndRecv() (*Index, error)
+	CloseAndRecv() (*CreateRecordsResult, error)
 	grpc.ClientStream
 }
 
@@ -96,47 +90,29 @@ func (x *serviceCreateWithStreamDataClient) Send(m *CreateIndexStreamRequest) er
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *serviceCreateWithStreamDataClient) CloseAndRecv() (*Index, error) {
+func (x *serviceCreateWithStreamDataClient) CloseAndRecv() (*CreateRecordsResult, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(Index)
+	m := new(CreateRecordsResult)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *serviceClient) Delete(ctx context.Context, in *Id, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *serviceClient) DeleteNode(ctx context.Context, in *Path, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, Service_Delete_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Service_DeleteNode_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serviceClient) Get(ctx context.Context, in *Id, opts ...grpc.CallOption) (*Index, error) {
-	out := new(Index)
-	err := c.cc.Invoke(ctx, Service_Get_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serviceClient) Put(ctx context.Context, in *Index, opts ...grpc.CallOption) (*Index, error) {
-	out := new(Index)
-	err := c.cc.Invoke(ctx, Service_Put_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serviceClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*Indexes, error) {
-	out := new(Indexes)
-	err := c.cc.Invoke(ctx, Service_List_FullMethodName, in, out, opts...)
+func (c *serviceClient) ListNodes(ctx context.Context, in *Path, opts ...grpc.CallOption) (*Nodes, error) {
+	out := new(Nodes)
+	err := c.cc.Invoke(ctx, Service_ListNodes_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +128,7 @@ func (c *serviceClient) PatchRecords(ctx context.Context, in *PatchRecordsReques
 	return out, nil
 }
 
-func (c *serviceClient) ListRecords(ctx context.Context, in *ListRecordsRequest, opts ...grpc.CallOption) (*ListRecordsResult, error) {
+func (c *serviceClient) ListRecords(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListRecordsResult, error) {
 	out := new(ListRecordsResult)
 	err := c.cc.Invoke(ctx, Service_ListRecords_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -161,9 +137,9 @@ func (c *serviceClient) ListRecords(ctx context.Context, in *ListRecordsRequest,
 	return out, nil
 }
 
-func (c *serviceClient) SearchRecords(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResult, error) {
+func (c *serviceClient) Search(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResult, error) {
 	out := new(SearchRecordsResult)
-	err := c.cc.Invoke(ctx, Service_SearchRecords_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Service_Search_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -174,25 +150,21 @@ func (c *serviceClient) SearchRecords(ctx context.Context, in *SearchRecordsRequ
 // All implementations must embed UnimplementedServiceServer
 // for forward compatibility
 type ServiceServer interface {
-	// Create allows to create a new index.
-	Create(context.Context, *CreateIndexRequest) (*Index, error)
-	// Create allows to create a new index, streaming the records data in the request
+	// Create allows to create the new records for a search.
+	Create(context.Context, *CreateRecordsRequest) (*CreateRecordsResult, error)
+	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(Service_CreateWithStreamDataServer) error
-	// Delete allows to remove an index by its id
-	Delete(context.Context, *Id) (*emptypb.Empty, error)
-	// Get returns information about the index
-	Get(context.Context, *Id) (*Index, error)
-	// Put allows to update the index tags
-	Put(context.Context, *Index) (*Index, error)
-	// List returns list of known indexes
-	List(context.Context, *ListRequest) (*Indexes, error)
-	// PatchRecords allows to insert, update or delete an index's records
+	// DeleteNode allows to delete a Node and all its children identified by the path provided
+	DeleteNode(context.Context, *Path) (*emptypb.Empty, error)
+	// ListNodes returns all known children for the Path provided
+	ListNodes(context.Context, *Path) (*Nodes, error)
+	// Patch allows to insert, update or delete an index's records
 	PatchRecords(context.Context, *PatchRecordsRequest) (*PatchRecordsResult, error)
-	// ListRecords returns list of records for an index
-	ListRecords(context.Context, *ListRecordsRequest) (*ListRecordsResult, error)
-	// SearchRecords runs the search across all indexes by the specified query. Result will
-	// be ordered by indexID:recordID order
-	SearchRecords(context.Context, *SearchRecordsRequest) (*SearchRecordsResult, error)
+	// ListRecords returns list of records for a path associated with it
+	ListRecords(context.Context, *ListRequest) (*ListRecordsResult, error)
+	// Search runs the search across all the index records matching the query. Result will
+	// be ordered by the ranks for the request.
+	Search(context.Context, *SearchRecordsRequest) (*SearchRecordsResult, error)
 	mustEmbedUnimplementedServiceServer()
 }
 
@@ -200,32 +172,26 @@ type ServiceServer interface {
 type UnimplementedServiceServer struct {
 }
 
-func (UnimplementedServiceServer) Create(context.Context, *CreateIndexRequest) (*Index, error) {
+func (UnimplementedServiceServer) Create(context.Context, *CreateRecordsRequest) (*CreateRecordsResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
 }
 func (UnimplementedServiceServer) CreateWithStreamData(Service_CreateWithStreamDataServer) error {
 	return status.Errorf(codes.Unimplemented, "method CreateWithStreamData not implemented")
 }
-func (UnimplementedServiceServer) Delete(context.Context, *Id) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+func (UnimplementedServiceServer) DeleteNode(context.Context, *Path) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteNode not implemented")
 }
-func (UnimplementedServiceServer) Get(context.Context, *Id) (*Index, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
-}
-func (UnimplementedServiceServer) Put(context.Context, *Index) (*Index, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
-}
-func (UnimplementedServiceServer) List(context.Context, *ListRequest) (*Indexes, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+func (UnimplementedServiceServer) ListNodes(context.Context, *Path) (*Nodes, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNodes not implemented")
 }
 func (UnimplementedServiceServer) PatchRecords(context.Context, *PatchRecordsRequest) (*PatchRecordsResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PatchRecords not implemented")
 }
-func (UnimplementedServiceServer) ListRecords(context.Context, *ListRecordsRequest) (*ListRecordsResult, error) {
+func (UnimplementedServiceServer) ListRecords(context.Context, *ListRequest) (*ListRecordsResult, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRecords not implemented")
 }
-func (UnimplementedServiceServer) SearchRecords(context.Context, *SearchRecordsRequest) (*SearchRecordsResult, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SearchRecords not implemented")
+func (UnimplementedServiceServer) Search(context.Context, *SearchRecordsRequest) (*SearchRecordsResult, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Search not implemented")
 }
 func (UnimplementedServiceServer) mustEmbedUnimplementedServiceServer() {}
 
@@ -241,7 +207,7 @@ func RegisterServiceServer(s grpc.ServiceRegistrar, srv ServiceServer) {
 }
 
 func _Service_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateIndexRequest)
+	in := new(CreateRecordsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -253,7 +219,7 @@ func _Service_Create_Handler(srv interface{}, ctx context.Context, dec func(inte
 		FullMethod: Service_Create_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).Create(ctx, req.(*CreateIndexRequest))
+		return srv.(ServiceServer).Create(ctx, req.(*CreateRecordsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -263,7 +229,7 @@ func _Service_CreateWithStreamData_Handler(srv interface{}, stream grpc.ServerSt
 }
 
 type Service_CreateWithStreamDataServer interface {
-	SendAndClose(*Index) error
+	SendAndClose(*CreateRecordsResult) error
 	Recv() (*CreateIndexStreamRequest, error)
 	grpc.ServerStream
 }
@@ -272,7 +238,7 @@ type serviceCreateWithStreamDataServer struct {
 	grpc.ServerStream
 }
 
-func (x *serviceCreateWithStreamDataServer) SendAndClose(m *Index) error {
+func (x *serviceCreateWithStreamDataServer) SendAndClose(m *CreateRecordsResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -284,74 +250,38 @@ func (x *serviceCreateWithStreamDataServer) Recv() (*CreateIndexStreamRequest, e
 	return m, nil
 }
 
-func _Service_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Id)
+func _Service_DeleteNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Path)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceServer).Delete(ctx, in)
+		return srv.(ServiceServer).DeleteNode(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Service_Delete_FullMethodName,
+		FullMethod: Service_DeleteNode_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).Delete(ctx, req.(*Id))
+		return srv.(ServiceServer).DeleteNode(ctx, req.(*Path))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Service_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Id)
+func _Service_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Path)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceServer).Get(ctx, in)
+		return srv.(ServiceServer).ListNodes(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Service_Get_FullMethodName,
+		FullMethod: Service_ListNodes_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).Get(ctx, req.(*Id))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Service_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Index)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServiceServer).Put(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Service_Put_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).Put(ctx, req.(*Index))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Service_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServiceServer).List(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Service_List_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).List(ctx, req.(*ListRequest))
+		return srv.(ServiceServer).ListNodes(ctx, req.(*Path))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -375,7 +305,7 @@ func _Service_PatchRecords_Handler(srv interface{}, ctx context.Context, dec fun
 }
 
 func _Service_ListRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRecordsRequest)
+	in := new(ListRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -387,25 +317,25 @@ func _Service_ListRecords_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: Service_ListRecords_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).ListRecords(ctx, req.(*ListRecordsRequest))
+		return srv.(ServiceServer).ListRecords(ctx, req.(*ListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Service_SearchRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Service_Search_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SearchRecordsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServiceServer).SearchRecords(ctx, in)
+		return srv.(ServiceServer).Search(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Service_SearchRecords_FullMethodName,
+		FullMethod: Service_Search_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).SearchRecords(ctx, req.(*SearchRecordsRequest))
+		return srv.(ServiceServer).Search(ctx, req.(*SearchRecordsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -414,7 +344,7 @@ func _Service_SearchRecords_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Service_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "index.v1.Service",
+	ServiceName: "index.v2.Service",
 	HandlerType: (*ServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -422,20 +352,12 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Service_Create_Handler,
 		},
 		{
-			MethodName: "Delete",
-			Handler:    _Service_Delete_Handler,
+			MethodName: "DeleteNode",
+			Handler:    _Service_DeleteNode_Handler,
 		},
 		{
-			MethodName: "Get",
-			Handler:    _Service_Get_Handler,
-		},
-		{
-			MethodName: "Put",
-			Handler:    _Service_Put_Handler,
-		},
-		{
-			MethodName: "List",
-			Handler:    _Service_List_Handler,
+			MethodName: "ListNodes",
+			Handler:    _Service_ListNodes_Handler,
 		},
 		{
 			MethodName: "PatchRecords",
@@ -446,8 +368,8 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Service_ListRecords_Handler,
 		},
 		{
-			MethodName: "SearchRecords",
-			Handler:    _Service_SearchRecords_Handler,
+			MethodName: "Search",
+			Handler:    _Service_Search_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
