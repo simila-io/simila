@@ -231,7 +231,7 @@ func (x *Nodes) GetNodes() []*Node {
 	return nil
 }
 
-// CreateIndexRequest allows to create a new index
+// CreateRecordsRequest is used for the creation of the new index records.
 type CreateRecordsRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -239,7 +239,7 @@ type CreateRecordsRequest struct {
 
 	// path contains the path to a node the all records will be associated with. If one or several
 	// nodes in the path do not exist, they will be created automatically with folder type.
-	// path cannot contain "document" nodes, but last one. They type
+	// path cannot contain "document" nodes in the middle, but last one.
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	// nodeType contains the node type the records will be added to if it will be created during the call.
 	// This is the last name in the path and if it doesn't exist, it will be created with the type
@@ -451,7 +451,7 @@ func (x *CreateRecordsResult) GetRecordsCreated() int64 {
 	return 0
 }
 
-// Record represents an index record
+// Record represents the index record
 type Record struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

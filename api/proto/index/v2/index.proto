@@ -6,11 +6,11 @@ import "google/protobuf/empty.proto";
 package index.v2;
 option go_package = "./index/v2;index";
 
-// Service provides an external API for managing the index records
+// Service provides an API for working with the index objects (nodes, records, etc)
 service Service {
-  // Create allows to new records for a search.
+  // Create allows to create the new records for a search.
   rpc Create(CreateRecordsRequest) returns (CreateRecordsResult);
-  // Create allows to create a new records, streaming the records data in the request
+  // CreateWithStreamData allows to create new index records by streaming the records.
   rpc CreateWithStreamData(stream CreateIndexStreamRequest) returns (CreateRecordsResult);
   // DeleteNode allows to delete a Node and all its children identified by the path provided
   rpc DeleteNode(Path) returns (google.protobuf.Empty);
@@ -20,8 +20,8 @@ service Service {
   rpc PatchRecords(PatchRecordsRequest) returns (PatchRecordsResult);
   // ListRecords returns list of records for a path associated with it
   rpc ListRecords(ListRequest) returns (ListRecordsResult);
-  // Search runs the search across all indexes by the specified query. Result will
-  // be ordered by the ranks for the request
+  // Search runs the search across all the index records matching the query. Result will
+  // be ordered by the ranks for the request.
   rpc Search(SearchRecordsRequest) returns (SearchRecordsResult);
 }
 
@@ -50,11 +50,11 @@ message Nodes {
   repeated Node nodes = 1;
 }
 
-// CreateIndexRequest allows to create a new index
+// CreateRecordsRequest is used for the creation of the new index records.
 message CreateRecordsRequest {
   // path contains the path to a node the all records will be associated with. If one or several
   // nodes in the path do not exist, they will be created automatically with folder type.
-  // path cannot contain "document" nodes, but last one. They type
+  // path cannot contain "document" nodes in the middle, but last one.
   string path = 1;
   // nodeType contains the node type the records will be added to if it will be created during the call.
   // This is the last name in the path and if it doesn't exist, it will be created with the type
@@ -85,7 +85,7 @@ message CreateRecordsResult {
   int64 recordsCreated = 2;
 }
 
-// Record represents an index record
+// Record represents the index record
 message Record {
   // id of the record within the node. This value is created by parser or during the records insertion.
   // it is used for the updating records or deleting them within a node

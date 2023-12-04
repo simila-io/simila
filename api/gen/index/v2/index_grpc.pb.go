@@ -33,9 +33,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServiceClient interface {
-	// Create allows to new records for a search.
+	// Create allows to create the new records for a search.
 	Create(ctx context.Context, in *CreateRecordsRequest, opts ...grpc.CallOption) (*CreateRecordsResult, error)
-	// Create allows to create a new records, streaming the records data in the request
+	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(ctx context.Context, opts ...grpc.CallOption) (Service_CreateWithStreamDataClient, error)
 	// DeleteNode allows to delete a Node and all its children identified by the path provided
 	DeleteNode(ctx context.Context, in *Path, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -45,8 +45,8 @@ type ServiceClient interface {
 	PatchRecords(ctx context.Context, in *PatchRecordsRequest, opts ...grpc.CallOption) (*PatchRecordsResult, error)
 	// ListRecords returns list of records for a path associated with it
 	ListRecords(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListRecordsResult, error)
-	// Search runs the search across all indexes by the specified query. Result will
-	// be ordered by the ranks for the request
+	// Search runs the search across all the index records matching the query. Result will
+	// be ordered by the ranks for the request.
 	Search(ctx context.Context, in *SearchRecordsRequest, opts ...grpc.CallOption) (*SearchRecordsResult, error)
 }
 
@@ -150,9 +150,9 @@ func (c *serviceClient) Search(ctx context.Context, in *SearchRecordsRequest, op
 // All implementations must embed UnimplementedServiceServer
 // for forward compatibility
 type ServiceServer interface {
-	// Create allows to new records for a search.
+	// Create allows to create the new records for a search.
 	Create(context.Context, *CreateRecordsRequest) (*CreateRecordsResult, error)
-	// Create allows to create a new records, streaming the records data in the request
+	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(Service_CreateWithStreamDataServer) error
 	// DeleteNode allows to delete a Node and all its children identified by the path provided
 	DeleteNode(context.Context, *Path) (*emptypb.Empty, error)
@@ -162,8 +162,8 @@ type ServiceServer interface {
 	PatchRecords(context.Context, *PatchRecordsRequest) (*PatchRecordsResult, error)
 	// ListRecords returns list of records for a path associated with it
 	ListRecords(context.Context, *ListRequest) (*ListRecordsResult, error)
-	// Search runs the search across all indexes by the specified query. Result will
-	// be ordered by the ranks for the request
+	// Search runs the search across all the index records matching the query. Result will
+	// be ordered by the ranks for the request.
 	Search(context.Context, *SearchRecordsRequest) (*SearchRecordsResult, error)
 	mustEmbedUnimplementedServiceServer()
 }
