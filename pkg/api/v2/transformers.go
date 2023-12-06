@@ -18,6 +18,8 @@ import (
 	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v2"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 func toApiFormat(mFmt persistence.Format) *format.Format {
@@ -78,4 +80,46 @@ func toApiNode(node persistence.Node) *index.Node {
 		Tags: node.Tags,
 		Type: t,
 	}
+}
+
+func toApiRecord(mRec persistence.IndexRecord) *index.Record {
+	return &index.Record{
+		Id:             mRec.ID,
+		Segment:        mRec.Segment,
+		Vector:         mRec.Vector,
+		Format:         mRec.Format,
+		RankMultiplier: float32(mRec.RankMult),
+	}
+}
+
+func toApiRecords(mRecs []persistence.IndexRecord) []*index.Record {
+	res := make([]*index.Record, len(mRecs))
+	for i, r := range mRecs {
+		res[i] = toApiRecord(r)
+	}
+	return res
+}
+
+func toApiSearchRecord(sr persistence.SearchQueryResultItem) *index.SearchRecordsResultItem {
+	res := &index.SearchRecordsResultItem{}
+	res.Record = toApiRecord(sr.IndexRecord)
+	res.Path = sr.Path
+	res.MatchedKeywords = sr.MatchedKeywordsList
+	res.Score = &sr.Score
+	return res
+}
+
+func toApiSearchRecords(srs []persistence.SearchQueryResultItem) []*index.SearchRecordsResultItem {
+	res := make([]*index.SearchRecordsResultItem, len(srs))
+	for i, sr := range srs {
+		res[i] = toApiSearchRecord(sr)
+	}
+	return res
+}
+
+func protoTime2Time(pt *timestamppb.Timestamp) time.Time {
+	if pt == nil {
+		return time.Time{}
+	}
+	return pt.AsTime()
 }

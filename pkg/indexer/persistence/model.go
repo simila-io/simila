@@ -87,6 +87,7 @@ type (
 
 	SearchQueryResultItem struct {
 		IndexRecord
+		Path                string
 		MatchedKeywordsList []string // mapped manually after filling the MatchedKeywords
 		MatchedKeywords     string   `db:"matched_keywords"`
 		Score               float32  `db:"score"`

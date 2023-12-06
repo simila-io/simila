@@ -157,6 +157,123 @@ func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.No
 	return nodes2Create
 }
 
+func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) (*emptypb.Empty, error) {
+	s.logger.Infof("deleteNode(): path=%q, force=%t", path.Path, force)
+	mtx := s.Db.NewModelTx(ctx)
+	mtx.MustBegin()
+	defer func() {
+		_ = mtx.Rollback()
+	}()
+	res := &emptypb.Empty{}
+	n, err := mtx.GetNode(path.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	err = mtx.DeleteNode(n.ID, force)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	mtx.Commit()
+	return res, nil
+}
+
+func (s *Service) listNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
+	mtx := s.Db.NewModelTx(ctx)
+	res := &index.Nodes{}
+	nodes, err := mtx.ListNodes(path.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	res.Nodes = toApiNodes(nodes)
+	return res, nil
+}
+
+func (s *Service) listRecords(ctx context.Context, request *index.ListRequest) (*index.ListRecordsResult, error) {
+	mtx := s.Db.NewModelTx(ctx)
+	res := &index.ListRecordsResult{}
+	q := persistence.IndexRecordQuery{
+		Format:        cast.Value(request.Format, ""),
+		CreatedAfter:  protoTime2Time(request.CreatedAfter),
+		CreatedBefore: protoTime2Time(request.CreatedBefore),
+		FromID:        cast.Value(request.PageId, ""),
+	}
+	q.Limit = int(cast.Value(request.Limit, 100))
+	if q.Limit < 1 || q.Limit > 1000 {
+		q.Limit = 1000
+	}
+	node, err := mtx.GetNode(request.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	q.NodeID = node.ID
+	qr, err := mtx.QueryIndexRecords(q)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	res.Total = qr.Total
+	if qr.NextID != "" {
+		res.NextPageId = &qr.NextID
+	}
+	res.Records = toApiRecords(qr.Items)
+	return res, nil
+}
+
+func (s *Service) search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
+	mtx := s.Db.NewModelTx(ctx)
+	res := &index.SearchRecordsResult{}
+	q := persistence.SearchQuery{
+		Path:   request.Path,
+		Query:  request.Text,
+		Tags:   request.Tags,
+		Strict: cast.Value(request.Strict, false),
+		Offset: int(cast.Value(request.Offset, 0)),
+		Limit:  int(cast.Value(request.Limit, 0)),
+	}
+	if q.Limit < 1 || q.Limit > 1000 {
+		q.Limit = 1000
+	}
+	qr, err := mtx.Search(q)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	res.Total = qr.Total
+	res.Items = toApiSearchRecords(qr.Items)
+	return res, nil
+}
+
+func (s *Service) patchIndexRecords(ctx context.Context, request *index.PatchRecordsRequest) (*index.PatchRecordsResult, error) {
+	s.logger.Debugf("patchIndexRecords(): %s", request)
+	if request == nil {
+		return &index.PatchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
+	}
+	mtx := s.Db.NewModelTx(ctx)
+	mtx.MustBegin()
+	defer func() {
+		_ = mtx.Rollback()
+	}()
+	res := &index.PatchRecordsResult{}
+	node, err := mtx.GetNode(request.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+
+	addRecs := toModelIndexRecordsFromApiRecords(node.ID, request.UpsertRecords, 1.0)
+	delRecs := toModelIndexRecordsFromApiRecords(node.ID, request.DeleteRecords, 1.0)
+
+	n, err := mtx.UpsertIndexRecords(addRecs...)
+	if err != nil {
+		return res, errors.GRPCWrap(fmt.Errorf("index records patch(upsert) failed: %w", err))
+	}
+	res.Upserted = n
+	n, err = mtx.DeleteIndexRecords(delRecs...)
+	if err != nil && !errors.Is(err, errors.ErrNotExist) {
+		return res, errors.GRPCWrap(fmt.Errorf("index records patch(delete) failed: %w", err))
+	}
+	res.Deleted = n
+	_ = mtx.Commit()
+	return res, nil
+}
+
 func (s *Service) createFormat(ctx context.Context, req *format.Format) (*format.Format, error) {
 	s.logger.Infof("createFormat(): request=%s", req)
 	if req == nil {
@@ -210,35 +327,28 @@ func (s *Service) listFormat(ctx context.Context, _ *emptypb.Empty) (*format.For
 }
 
 // -------------------------- index.Service ---------------------------
-
 func (ids idxService) Create(ctx context.Context, request *index.CreateRecordsRequest) (*index.CreateRecordsResult, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.s.createRecords(ctx, request, nil)
 }
 
 func (ids idxService) DeleteNode(ctx context.Context, path *index.Path) (*emptypb.Empty, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.s.deleteNode(ctx, path, true)
 }
 
 func (ids idxService) ListNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.s.listNodes(ctx, path)
 }
 
 func (ids idxService) ListRecords(ctx context.Context, request *index.ListRequest) (*index.ListRecordsResult, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.s.listRecords(ctx, request)
 }
 
 func (ids idxService) Search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.s.search(ctx, request)
 }
 
 func (ids idxService) PatchRecords(ctx context.Context, request *index.PatchRecordsRequest) (*index.PatchRecordsResult, error) {
-	//TODO implement me
-	panic("implement me")
+	return ids.PatchRecords(ctx, request)
 }
 
 func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStreamDataServer) error {

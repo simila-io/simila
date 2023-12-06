@@ -56,15 +56,18 @@ type (
 		//
 		// Example: for the nodes={<"/", "a">, <"/a/", "c">, <"/a/", "b">, <"/a/b/", "cc">} the result for the "/a/" will be {<"/a/", "c">, <"/a/", "b">}
 		ListChildren(path string) ([]Node, error)
+
+		// GetNode returns the node by its fqpn
+		GetNode(fqpn string) (Node, error)
 		// DeleteNode deletes the Node and all records associated with the Node.
 		// force allows to delete folder nodes with children. If the node is folder, and there are children,
 		// but the force flag is false, the function will return ErrConflict error
 		DeleteNode(nID int64, force bool) error
 
 		// UpsertIndexRecords creates or updates index record entries. It returns the new records created
-		UpsertIndexRecords(records ...IndexRecord) (int, error)
+		UpsertIndexRecords(records ...IndexRecord) (int64, error)
 		// DeleteIndexRecords deletes index record entries
-		DeleteIndexRecords(records ...IndexRecord) (int, error)
+		DeleteIndexRecords(records ...IndexRecord) (int64, error)
 		// QueryIndexRecords lists query matching index record entries
 		QueryIndexRecords(query IndexRecordQuery) (QueryResult[IndexRecord, string], error)
 
