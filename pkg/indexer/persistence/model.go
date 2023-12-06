@@ -16,7 +16,6 @@ package persistence
 
 import (
 	"database/sql/driver"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -36,34 +35,37 @@ type (
 
 	Tags map[string]string
 
-	Index struct {
-		ID        string    `db:"id"`
-		Format    string    `db:"format"`
+	// Node describes an object. The node has Path and Name, and the pair <Path, Name> must
+	// be unique within the tree. Name cannot be empty.
+	//
+	// Root path is "/". The 3rd level path, for example, could be "/aaa/bbb/ccc/". Path is always ends by "/"
+	Node struct {
+		ID   int64  `db:"id"`
+		Path string `db:"path"`
+		// Name is either name of the folder or a document
+		Name      string    `db:"name"`
+		Parent    int64     `db:"parent_id"`
 		Tags      Tags      `db:"tags"`
+		Flags     int32     `db:"flags"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
-	IndexQuery struct {
-		Format        string
-		Tags          Tags
-		CreatedAfter  time.Time
-		CreatedBefore time.Time
-		FromID        string
-		Limit         int
-	}
-
 	IndexRecord struct {
 		ID        string    `db:"id"`
-		IndexID   string    `db:"index_id"`
+		NodeID    int64     `db:"node_id"`
 		Segment   string    `db:"segment"`
 		Vector    Vector    `db:"vector"`
+		Format    string    `db:"format"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
 
 	IndexRecordQuery struct {
-		IndexIDs      []string
+		// Format is filter records by the format. If empty no format filter
+		Format string
+		// NodeID sets the ID of the node
+		NodeID        int64
 		CreatedAfter  time.Time
 		CreatedBefore time.Time
 		FromID        string
@@ -71,14 +73,16 @@ type (
 	}
 
 	SearchQuery struct {
-		IndexIDs     []string
-		Query        string // underlying search engine query
-		Tags         Tags   // index tags
-		Distinct     bool   // if true, returns at most 1 result per index
-		OrderByScore bool   // if true, sorts the result by the result relevancy score
-		FromID       string
-		Offset       int
-		Limit        int
+		Path  string
+		Query string // underlying search engine query
+		Tags  Tags   // index tags
+		// Strict defines the search records behavior:
+		// - If true, the search will select between all records associated with the Path node only (Path == "PathXName" for the Node with <PathX, Name> pair)
+		// - if false, the search will select between records in the Path subtree for all records there (every Node which's path has Path prefix),
+		// but only one most relevant record per one node (one record per <PathX, Name> pair)
+		Strict bool
+		Offset int
+		Limit  int
 	}
 
 	SearchQueryResultItem struct {
@@ -93,37 +97,11 @@ type (
 		NextID N
 		Total  int64
 	}
-
-	IndexRecordID struct {
-		IndexID  string `json:"index_id"`
-		RecordID string `json:"record_id"`
-	}
 )
 
-func (id IndexRecordID) Encode() string {
-	if len(id.RecordID) == 0 && len(id.IndexID) == 0 {
-		return ""
-	}
-	bb, err := json.Marshal(id)
-	if err != nil {
-		panic(fmt.Sprintf("failed to json marshal IndexRecordID: %v", err))
-	}
-	return base64.StdEncoding.EncodeToString(bb)
-}
-
-func (id *IndexRecordID) Decode(s string) error {
-	if len(s) == 0 {
-		return nil
-	}
-	bb, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return fmt.Errorf("failed to base64 decode IndexRecordID: %v", err)
-	}
-	if err = json.Unmarshal(bb, id); err != nil {
-		return fmt.Errorf("failed to json unmashal IndexRecordID: %v", err)
-	}
-	return nil
-}
+const (
+	NODE_FLAG_DOCUMENT = 1 // if it is set, it is a document. If not set, it is a folder
+)
 
 func (t Tags) Value() (value driver.Value, err error) {
 	return json.Marshal(t)

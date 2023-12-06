@@ -46,23 +46,23 @@ type (
 		// ListFormats lists all the existing format entries
 		ListFormats() ([]Format, error)
 
-		// CreateIndex creates index entry based on source ID
-		CreateIndex(index Index) (Index, error)
-		// GetIndex retrieves index info by ID
-		GetIndex(ID string) (Index, error)
-		// UpdateIndex updates index info
-		UpdateIndex(index Index) error
-		// DeleteIndex deletes index entry and all the related records
-		DeleteIndex(ID string) error
-		// QueryIndexes lists query matching index entries
-		QueryIndexes(query IndexQuery) (QueryResult[Index, string], error)
+		// CreateNode allows to create a new Node. If the Node with the path already exists, the function will return
+		// ErrExists
+		CreateNode(node Node) (Node, error)
+		// ListNodes returns all nodes for the path. For example for the path="/a/b/doc.txt" the result nodes will be
+		// {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
+		ListNodes(path string) ([]Node, error)
+		// ListChildren returns the children for the path: all nodes of the 1st level with the path prefix in Path
+		//
+		// Example: for the nodes={<"/", "a">, <"/a/", "c">, <"/a/", "b">, <"/a/b/", "cc">} the result for the "/a/" will be {<"/a/", "c">, <"/a/", "b">}
+		ListChildren(path string) ([]Node, error)
+		// DeleteNode deletes the Node and all records associated with the Node.
+		// force allows to delete folder nodes with children. If the node is folder, and there are children,
+		// but the force flag is false, the function will return ErrConflict error
+		DeleteNode(nID int64, force bool) error
 
 		// UpsertIndexRecords creates or updates index record entries
 		UpsertIndexRecords(records ...IndexRecord) error
-		// GetIndexRecord retrieves index record entry
-		GetIndexRecord(ID, indexID string) (IndexRecord, error)
-		// UpdateIndexRecord updates index record
-		UpdateIndexRecord(record IndexRecord) error
 		// DeleteIndexRecords deletes index record entries
 		DeleteIndexRecords(records ...IndexRecord) (int, error)
 		// QueryIndexRecords lists query matching index record entries
