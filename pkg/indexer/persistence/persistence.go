@@ -46,9 +46,9 @@ type (
 		// ListFormats lists all the existing format entries
 		ListFormats() ([]Format, error)
 
-		// CreateNode allows to create a new Node. If the Node with the path already exists, the function will return
-		// ErrExists
-		CreateNode(node Node) (Node, error)
+		// CreateNodes allows to create one or several new Nodes. If a Node with the path already exists, the function will return
+		// ErrExists.
+		CreateNodes(nodes ...Node) ([]Node, error)
 		// ListNodes returns all nodes for the path. For example for the path="/a/b/doc.txt" the result nodes will be
 		// {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
 		ListNodes(path string) ([]Node, error)
