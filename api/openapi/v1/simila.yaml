@@ -244,12 +244,16 @@ components:
       description: The object describes the index node.
       required:
         - name
+        - fullPath
         - type
         - tags
       properties:
         name:
           type: string
           description: The node name, must be unique among the siblings in the tree.
+        fullPath:
+          type: string
+          description: The node full path (identifier) within the index.
         type:
           $ref: '#/components/schemas/NodeType'
         tags:
