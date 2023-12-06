@@ -44,7 +44,6 @@ type (
 		Path string `db:"path"`
 		// Name is either name of the folder or a document
 		Name      string    `db:"name"`
-		Parent    int64     `db:"parent_id"`
 		Tags      Tags      `db:"tags"`
 		Flags     int32     `db:"flags"`
 		CreatedAt time.Time `db:"created_at"`
