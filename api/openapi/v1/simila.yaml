@@ -10,7 +10,7 @@ paths:
       tags:
         - Formats
       summary: Create new format
-      description: The call allows to create a new format if it doesn't exist yet.
+      description: Create a new format if it doesn't exist yet.
       operationId: CreateFormat
       requestBody:
         required: true
@@ -26,16 +26,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/Format'
         409:
-          description: Format with the name already exists
+          description: The format with the name already exists.
     get:
       tags:
         - Formats
-      summary: Retreive all known formats
-      description: The call returns all known formats.
-      operationId: GetFormats
+      summary: List formats
+      description: List formats.
+      operationId: ListFormats
       responses:
         201:
-          description: The list retrieved successfully.
+          description: The format list retrieved successfully.
           content:
             application/json:
               schema:
@@ -44,164 +44,131 @@ paths:
     get:
       tags:
         - Formats
-      description: Get format by its name(identifier)
+      summary: Get format
+      description: Get format.
       operationId: GetFormat
       parameters:
         - $ref: '#/components/parameters/FormatId'
       responses:
         200:
-          description: OK
+          description: The format was retrieved successfully.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Format'
         404:
-          description: the format is not found
+          description: The format is not found.
     delete:
       tags:
         - Formats
-      description: Delete format by its name(identifier). The format maybe deleted if it is not used and if it was created via the API call.
+      summary: Delete format
+      description: Delete format. The format can be deleted if it is not used and not system defined.
       operationId: DeleteFormat
       parameters:
         - $ref: '#/components/parameters/FormatId'
       responses:
         204:
-          description: OK
+          description: The format was deleted successfully.
         403:
-          description: the format could not be deleted, cause it was not created by the API call
+          description: The format could not be deleted since it is system defined.
         404:
-          description: the format is not found
+          description: The format was not found.
         409:
-          description: the format exists, but cannot be deleted due to some constraints
-  /indexes:
+          description: The format exists but cannot be deleted due to dependencies.
+  /nodes:
+    get:
+      tags:
+        - Nodes
+      summary: List nodes
+      description: List nodes.
+      operationId: ListNodes
+      parameters:
+        - $ref: '#/components/parameters/PathFilter'
+      responses:
+        200:
+          description: The nodes list retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListNodesResult'
+  /nodes/{path}:
+    delete:
+      tags:
+        - Nodes
+      summary: Delete node
+      description: Delete node (and all children).
+      operationId: DeleteNode
+      parameters:
+        - $ref: '#/components/parameters/Path'
+      responses:
+        204:
+          description: The node was deleted successfully.
+        404:
+          description: The node was not found.
+  /nodes/{path}/records:
     post:
       tags:
-        - Indexes
-      summary: Create new index
-      description: The call allows to create a new index. The call also allows to create the index records as well. The call accepts two different contatent types - json and multiform data. The index metadata is described as JSON together with possible new index records or the document context, which maybe passed as a binary slice or as a stream.
-      operationId: CreateIndex
+        - Records
+      summary: Create node records
+      description: Create node records. The call accepts two different content types - json and multiform data.
+      operationId: CreateNodeRecords
+      parameters:
+        - $ref: '#/components/parameters/Path'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateIndexRequest'
+              $ref: '#/components/schemas/CreateRecordsRequest'
           multipart/form-data:
             schema:
               type: object
               properties:
                 meta:
-                  $ref: '#/components/schemas/CreateIndexRequest'
-                file: # Part2 (object)
+                  $ref: '#/components/schemas/CreateRecordsRequest'
+                file:
                   type: string
                   format: binary
-                  description: contains the binary data for the document of the specified format
+                  description: The document binary data in the specified format.
       responses:
         201:
-          description: The index is created successfully.
+          description: The records were created successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Format'
+                $ref: '#/components/schemas/CreateRecordsResult'
         409:
-          description: Index with the Id already exists
+          description: The records were not created due to a conflict.
     get:
       tags:
-        - Indexes
-      summary: Retreive indexes
-      description: The call returns all known indexes. It supports pagination and filtering by the query params.
-      operationId: GetIndexes
+        - Records
+      summary: List node records
+      description: List node records.
+      operationId: ListNodeRecords
       parameters:
-        - $ref: '#/components/parameters/CreatedAfter'
-        - $ref: '#/components/parameters/CreatedBefore'
-        - $ref: '#/components/parameters/StartIndexId'
-        - $ref: '#/components/parameters/FormatParam'
-        - $ref: '#/components/parameters/TagsParam'
-        - $ref: '#/components/parameters/Limit'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Indexes'
-  /indexes/{indexId}:
-    get:
-      tags:
-        - Indexes
-      description: retrieves the index by its ID.
-      operationId: GetIndex
-      parameters:
-        - $ref: '#/components/parameters/IndexId'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Index'
-        404:
-          description: the index with such id is not found
-    put:
-      tags:
-        - Indexes
-      description: allows to update index.
-      operationId: PutIndex
-      parameters:
-        - $ref: '#/components/parameters/IndexId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Index'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Index'
-        404:
-          description: the index with such id is not found
-    delete:
-      tags:
-        - Indexes
-      description: allows to delete an existing index.
-      operationId: DeleteIndex
-      parameters:
-        - $ref: '#/components/parameters/IndexId'
-      responses:
-        204:
-          description: OK
-        404:
-          description: the index with such id is not found
-  /indexes/{indexId}/records:
-    get:
-      tags:
-        - Indexes
-      description: returns an index's records in the record IDs order.
-      operationId: GetIndexRecords
-      parameters:
-        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/Path'
+        - $ref: '#/components/parameters/FormatFilter'
+        - $ref: '#/components/parameters/CreatedAfterFilter'
+        - $ref: '#/components/parameters/CreatedBeforeFilter'
         - $ref: '#/components/parameters/PageId'
         - $ref: '#/components/parameters/Limit'
       responses:
         200:
-          description: OK
+          description: The list of records retrieved successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RecordsResult'
+                $ref: '#/components/schemas/ListRecordsResult'
         404:
-          description: the index with such id is not found
+          description: The node was not found.
     patch:
       tags:
-        - Indexes
-      description: provides a group index records update. The operation has the list ofr records that should be inserted or replaced and the list of recors that should be deleted from the index.
-      operationId: PatchIndexRecords
+        - Records
+      summary: Patch node records
+      description: Patch node records.
+      operationId: PatchNodeRecords
       parameters:
-        - $ref: '#/components/parameters/IndexId'
+        - $ref: '#/components/parameters/Path'
       requestBody:
         required: true
         content:
@@ -210,22 +177,23 @@ paths:
               $ref: '#/components/schemas/PatchRecordsRequest'
       responses:
         200:
-          description: OK
+          description: The records were patched successfully.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PatchRecordsResult'
         404:
-          description: the index with such id is not found
+          description: The node was not found.
   /ping:
     get:
       tags:
         - Ping
-      description: service check operation.
+      summary: Health check
+      description: Health check, check if the API server is up and running.
       operationId: Ping
       responses:
         200:
-          description: OK
+          description: The ping was successful.
           content:
             application/json:
               schema:
@@ -234,52 +202,23 @@ paths:
     post:
       tags:
         - Search
-      description: The call runs the text search across indexes' records. It accepts different search parameters for filtering and the output.
+      description: Search text across the index records.
       operationId: Search
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SearchRequest'
+              $ref: '#/components/schemas/SearchRecordsRequest'
       responses:
         200:
-          description: OK
+          description: The search was successful.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RecordsResult'
-
-
+                $ref: '#/components/schemas/SearchRecordsResult'
 components:
   schemas:
-    CreateIndexRequest:
-      type: object
-      description: The object describes a new index request.
-      required:
-        - id
-        - format
-        - tags
-        - document
-        - records
-      properties:
-        id:
-          type: string
-          description: the new index identifier. It must not be more than 64 bytes long
-        format:
-          type: string
-          description: the index format name
-        tags:
-          $ref: '#/components/schemas/Tags'
-        document:
-          type: string
-          format: byte
-          description: contains the binary data for the document of the specified format
-        records:
-          type: array
-          description: the list of records that must be added to the new index.
-          items:
-            $ref: '#/components/schemas/Record'
     Format:
       type: object
       description: The object describes a data format.
@@ -288,201 +227,307 @@ components:
       properties:
         name:
           type: string
-          description: The format name. It is used as the format identifier
+          description: The format name, it is used as the format identifier.
     Formats:
       type: object
-      description: The object is used as response of contact objects query request.
+      description: The object is used as a response of the formats list request.
       required:
         - formats
       properties:
         formats:
           type: array
-          description: The list of all known formats
+          description: Contains a list of formats.
           items:
             $ref: '#/components/schemas/Format'
-    Index:
+    Node:
       type: object
-      description: An index description
+      description: The object describes the index node.
+      required:
+        - name
+        - fullPath
+        - type
+        - tags
+      properties:
+        name:
+          type: string
+          description: The node name, must be unique among the siblings in the tree.
+        fullPath:
+          type: string
+          description: The node full path (identifier) within the index.
+        type:
+          $ref: '#/components/schemas/NodeType'
+        tags:
+          $ref: '#/components/schemas/Tags'
+    NodeType:
+      type: string
+      description: The object describes the index node type.
+      enum:
+        - folder
+        - document
+    Tags:
+      type: object
+      description: The object describes the node tags.
+      additionalProperties:
+        type: string
+    ListNodesResult:
+      type: object
+      description: The object is used as a response of the nodes list request.
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: The list of nodes.
+          items:
+            $ref: '#/components/schemas/Node'
+    Record:
+      type: object
+      description: The object contains information about the index record.
       required:
         - id
+        - segment
+        - vector
         - format
-        - tags
-        - createdAt
+        - rankMultiplier
       properties:
         id:
           type: string
+          description: The record identifier within the node.
+        segment:
+          type: string
+          description: The searchable text for the record.
+        vector:
+          type: string
+          description: The vector data for the segment.
+          format: byte
         format:
           type: string
+          description: The format of the record.
+        rankMultiplier:
+          type: number
+          default: 1.0
+          description: The priority coefficient (must be >= 1.0) of the record within a search result set.
+    CreateRecordsRequest:
+      type: object
+      description: The object is used for records creation.
+      required:
+        - nodeType
+        - tags
+        - parser
+        - document
+        - records
+        - rankMultiplier
+      properties:
+        nodeType:
+          $ref: '#/components/schemas/NodeType'
         tags:
           $ref: '#/components/schemas/Tags'
-        createdAt:
+        parser:
           type: string
-          format: date-time
-    Indexes:
-      type: object
-      description: The object contains information about an index record.
-      required:
-        - indexes
-        - total
-      properties:
-        indexes:
+          description: The parser name (format name) to be used for the document body.
+        document:
+          type: string
+          description: The binary data for the document of the specified format.
+          format: byte
+        records:
           type: array
-          description: The list of indexes
+          description: The list of records that must be added to the node.
           items:
-            $ref: '#/components/schemas/Index'
-        nextPageId:
-          type: string
-          description: the index Id for the next page, if presents
-        total:
+            $ref: '#/components/schemas/Record'
+        rankMultiplier:
+          type: number
+          default: 1.0
+          description: The priority coefficient (must be >= 1.0) of the records within a search result set, the value is overridden by the rankMultiplier value specified for an individual record.
+    CreateRecordsResult:
+      type: object
+      description: The object is used as a response of the records creation request.
+      required:
+        - nodesCreated
+        - recordsCreated
+      properties:
+        nodesCreated:
+          type: array
+          description: The list of nodes created.
+          items:
+            $ref: '#/components/schemas/Node'
+        recordsCreated:
           type: integer
-          description: total number of indexes that match the initial criteria
+          description: The number of records created.
     PatchRecordsRequest:
       type: object
+      description: The object is used to upsert and delete the node records.
       required:
-        - id
         - upsertRecords
         - deleteRecords
       properties:
-        id:
-          type: string
         upsertRecords:
           type: array
+          description: The records to be upserted for the node.
           items:
             $ref: '#/components/schemas/Record'
         deleteRecords:
           type: array
+          description: The records to be deleted for the node.
           items:
             $ref: '#/components/schemas/Record'
     PatchRecordsResult:
       type: object
+      description: The object is used as a response to the patch records request.
       required:
         - upserted
         - deleted
       properties:
         upserted:
           type: integer
+          description: The number of upserted records.
         deleted:
           type: integer
-    Record:
+          description: The number of deleted records.
+    ListRecordsResult:
       type: object
-      description: The object contains information about an index record.
+      description: The object is used a response to the list records request.
       required:
-        - id
-        - segment
-        - vector
-      properties:
-        id:
-          type: string
-          description: the record identifier within the index. The value must be unique for the index and it is defined by the format parser.
-        segment:
-          type: string
-          description: contains the searchable text for the record.
-        vector:
-          type: string
-          format: byte
-          description: contains the vector data for the record in the format basis. The format parser defines the basis and the field structure.
-    RecordsResult:
-      type: object
-      required:
-        - records
+        - items
         - total
       properties:
         records:
           type: array
+          description: The list of found records.
           items:
             $ref: '#/components/schemas/Record'
         nextPageId:
           type: string
+          description: The id of the next page for getting the rest of the records.
         total:
           type: integer
-    SearchRequest:
+          description: The total number of found records.
+    SearchRecordsRequest:
       type: object
+      description: The object is used to search text across all the index records.
       required:
         - text
         - tags
-        - indexIDs
-        - distinct
-        - orderByScore
-        - pageId
+        - path
+        - strict
         - offset
         - limit
       properties:
         text:
           type: string
+          description: The text to be found in the records.
         tags:
           $ref: '#/components/schemas/Tags'
-        indexIDs:
-          type: array
-          items:
-            type: string
-        distinct:
-          type: boolean
-        orderByScore:
-          type: boolean
-        pageId:
+        path:
           type: string
+          description: The node path where the text to be searched for, by default, this includes the node subtrees too.
+        strict:
+          type: boolean
+          description: The strict flag limits the search scope strictly to the node located by the provided path, i.e. the node subtrees are not included.
         offset:
           type: integer
+          description: The number of records to skip before start returning results.
         limit:
           type: integer
-    SearchRecord:
+          description: The maximum number of records per page.
+    SearchRecordsResult:
       type: object
+      description: The object is used as a response to the search records request.
       required:
-        - indexId
-        - indexRecord
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: The found index records.
+          items:
+            $ref: '#/components/schemas/SearchRecordsResultItem'
+        nextPageId:
+          type: string
+          description: The id of the next page for getting the rest of the records.
+        total:
+          type: integer
+          description: The total number of found records.
+    SearchRecordsResultItem:
+      type: object
+      description: The object is used as an item in the search records response.
+      required:
+        - path
+        - record
         - matchedKeywords
         - score
       properties:
-        indexId:
+        path:
           type: string
-        indexRecord:
+          description: The path of the record.
+        record:
           $ref: '#/components/schemas/Record'
         matchedKeywords:
           type: array
+          description: The matched keywords within the record.
           items:
             type: string
         score:
           type: number
           format: float
-    SearchResult:
-      type: object
-      required:
-        - records
-        - total
-      properties:
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchRecord'
-        nextPageId:
-          type: string
-        total:
-          type: integer
-    Tags:
-      type: object
-      additionalProperties:
-        type: string
+          description: The relevancy score of the record.
   parameters:
     #
     # In path params
     #
     FormatId:
-      name: formatId
       in: path
+      name: formatId
       description: The format identifier.
       required: true
       schema:
         type: string
-    IndexId:
-      name: indexId
+    Path:
       in: path
-      description: The index identifier.
+      name: path
+      description: The node path (identifier) within the index.
       required: true
       schema:
         type: string
     #
     # Query params
     #
+    FormatFilter:
+      in: query
+      name: format
+      description: The format specifies the format to filter the records by.
+      required: false
+      schema:
+        type: string
+    TagsFilter:
+      in: query
+      name: tags
+      description: The tags specifies the tags to filter the records by.
+      required: false
+      schema:
+        $ref: '#/components/schemas/Tags'
+    PathFilter:
+      in: query
+      name: path
+      description: The path specifies the path to filter by.
+      required: false
+      schema:
+        type: string
+    CreatedAfterFilter:
+      in: query
+      name: createdAfter
+      description: The createdAfter specifies the lowest creation time (exclusive) the resulting records can have.
+      required: false
+      schema:
+        type: string
+        format: date-time
+    CreatedBeforeFilter:
+      in: query
+      name: createdBefore
+      description: The createdBefore specifies the greatest creation time (exclusive) the resulting records can have.
+      required: false
+      schema:
+        type: string
+        format: date-time
     Limit:
       in: query
       name: limit
@@ -490,47 +535,10 @@ components:
       required: false
       schema:
         type: integer
-    FormatParam:
-      in: query
-      name: format
-      description: ""
-      required: false
-      schema:
-        type: string
-    TagsParam:
-      in: query
-      name: tags
-      description: ""
-      required: false
-      schema:
-        $ref: '#/components/schemas/Tags'
-    StartIndexId:
-      in: query
-      name: startIndexId
-      description: The indexId for the first record
-      required: false
-      schema:
-        type: string
     PageId:
       in: query
       name: pageId
-      description: The pageId for the paging request
+      description: The pageId specifies from which page to start return results.
       required: false
       schema:
         type: string
-    CreatedAfter:
-      in: query
-      name: createdAfter
-      description: start of time interval in which items are queried
-      required: false
-      schema:
-        type: string
-        format: date-time
-    CreatedBefore:
-      in: query
-      name: createdBefore
-      description: end of time interval in which items are queried
-      required: false
-      schema:
-        type: string
-        format: date-time
