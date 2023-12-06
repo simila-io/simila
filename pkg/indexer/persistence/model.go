@@ -56,6 +56,7 @@ type (
 		Segment   string    `db:"segment"`
 		Vector    Vector    `db:"vector"`
 		Format    string    `db:"format"`
+		RankMult  float64   `db:"rank_multiplier"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}

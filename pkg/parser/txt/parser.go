@@ -49,8 +49,8 @@ func (tp *txtParser) Init(ctx context.Context) error {
 	return nil
 }
 
-func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, idxId string, body io.Reader) (int64, error) {
-	tp.logger.Infof("scanning for id=%s", idxId)
+func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, nodeID int64, body io.Reader) (int64, error) {
+	tp.logger.Infof("scanning for node id=%d", nodeID)
 
 	scanner := bufio.NewScanner(body)
 	var recs []persistence.IndexRecord
@@ -63,7 +63,7 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, i
 		if len(trimmed) == 0 {
 			continue
 		}
-		recs = append(recs, persistence.IndexRecord{IndexID: idxId, ID: fmt.Sprintf("%08x", line), Segment: sgmnt})
+		recs = append(recs, persistence.IndexRecord{NodeID: nodeID, ID: fmt.Sprintf("%08x", line), Segment: sgmnt})
 		if len(recs) >= 100 {
 			if err := mtx.UpsertIndexRecords(recs...); err != nil {
 				return 0, err

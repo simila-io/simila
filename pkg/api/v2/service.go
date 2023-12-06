@@ -101,8 +101,46 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 		_ = mtx.Rollback()
 	}()
 
+	pths := persistence.SplitPath(request.Path)
+	if len(pths) == 0 {
+		return &index.CreateRecordsResult{}, errors.GRPCWrap(fmt.Errorf("the path=%q should not be empty: %w", request.Path, errors.ErrInvalid))
+	}
+	nodes, err := mtx.ListNodes(request.Path)
+	if err != nil {
+		return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
+	}
+	n2c := nodes2Create(pths, nodes, cast.Value(request.NodeType, index.NodeType_FOLDER))
+	if len(n2c) > 0 {
+		nodes, err = mtx.CreateNodes(n2c...)
+		if err != nil {
+			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
+		}
+	}
+	nID := nodes[len(nodes)-1].ID
+	if p != nil {
+
+	}
 	_ = mtx.Commit()
 	return &index.CreateRecordsResult{}, nil
+}
+
+func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.NodeType) []persistence.Node {
+	nodes2Create := []persistence.Node{}
+	if len(nodes) < len(pths) {
+		p := "/"
+		if len(nodes) > 0 {
+			n := nodes[len(nodes)-1]
+			p = persistence.ConcatPath(n.Path, n.Name)
+		}
+		for i := len(nodes); i < len(pths); i++ {
+			nodes2Create = append(nodes2Create, persistence.Node{Path: p, Name: pths[i]})
+			p = persistence.ConcatPath(p, pths[i])
+		}
+		if lastNodeType == index.NodeType_DOCUMENT {
+			nodes2Create[len(nodes2Create)-1].Flags = persistence.NODE_FLAG_DOCUMENT
+		}
+	}
+	return nodes2Create
 }
 
 func (s *Service) createFormat(ctx context.Context, req *format.Format) (*format.Format, error) {

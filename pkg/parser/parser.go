@@ -27,8 +27,8 @@ import (
 type (
 	// Parser allows to scan data in a specific format and update the index records
 	Parser interface {
-		// ScanRecords walks through the body, extracts the document records, and writes them via mtx to the index
-		ScanRecords(ctx context.Context, mtx persistence.ModelTx, idxId string, body io.Reader) (int64, error)
+		// ScanRecords walks through the body, extracts the document records, and writes them via mtx associating with the nodeId
+		ScanRecords(ctx context.Context, mtx persistence.ModelTx, nodeId int64, body io.Reader) (int64, error)
 	}
 
 	// Provider is a parsers holder.

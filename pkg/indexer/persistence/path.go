@@ -24,3 +24,21 @@ func SplitPath(path string) []string {
 	}
 	return res
 }
+
+// Path composes the path from the names
+func Path(names []string) string {
+	if len(names) == 0 {
+		return "/"
+	}
+	var sb strings.Builder
+	for _, n := range names {
+		sb.WriteString("/")
+		sb.WriteString(n)
+	}
+	return sb.String()
+}
+
+// ConcatPath allows to concat two pathes
+func ConcatPath(p1, p2 string) string {
+	return filepath.Clean("/" + p1 + "/" + p2)
+}
