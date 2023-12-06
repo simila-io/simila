@@ -37,13 +37,15 @@ enum NodeType {
 }
 
 message Node {
+  // path to the node
+  string path = 1;
   // name is the identifier of the node on the level of the tree. Name must be unique among the children of the same
   // node.
-  string name = 1;
+  string name = 2;
   // type of the node
-  NodeType type = 2;
+  NodeType type = 3;
   // tags defines the tags associated with the object
-  map<string, string> tags = 3;
+  map<string, string> tags = 4;
 }
 
 message Nodes {

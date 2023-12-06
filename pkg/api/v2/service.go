@@ -100,6 +100,7 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 	defer func() {
 		_ = mtx.Rollback()
 	}()
+	res := &index.CreateRecordsResult{}
 
 	pths := persistence.SplitPath(request.Path)
 	if len(pths) == 0 {
@@ -115,13 +116,26 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 		if err != nil {
 			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
 		}
+		res.NodesCreated = &index.Nodes{
+			Nodes: toApiNodes(nodes),
+		}
 	}
-	nID := nodes[len(nodes)-1].ID
+	node := nodes[len(nodes)-1]
 	if p != nil {
-
+		count, err := p.ScanRecords(ctx, mtx, node.ID, body)
+		if err != nil {
+			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %q format: %w", request.Parser, err))
+		}
+		s.logger.Infof("createRecords(): read %d records by parser %s for the node %q(%d)", count, p, persistence.ConcatPath(node.Path, node.Name), node.ID)
+	} else {
+		rc, err := mtx.UpsertIndexRecords(toModelIndexRecordsFromApiRecords(node.ID, request.Records, 1.0)...)
+		if err != nil {
+			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
+		}
+		res.RecordsCreated = int64(rc)
 	}
 	_ = mtx.Commit()
-	return &index.CreateRecordsResult{}, nil
+	return res, nil
 }
 
 func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.NodeType) []persistence.Node {

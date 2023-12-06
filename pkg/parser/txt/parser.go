@@ -63,7 +63,7 @@ func (tp *txtParser) ScanRecords(ctx context.Context, mtx persistence.ModelTx, n
 		if len(trimmed) == 0 {
 			continue
 		}
-		recs = append(recs, persistence.IndexRecord{NodeID: nodeID, ID: fmt.Sprintf("%08x", line), Segment: sgmnt})
+		recs = append(recs, persistence.IndexRecord{NodeID: nodeID, ID: fmt.Sprintf("%08x", line), Segment: sgmnt, RankMult: 1.0})
 		if len(recs) >= 100 {
 			if err := mtx.UpsertIndexRecords(recs...); err != nil {
 				return 0, err

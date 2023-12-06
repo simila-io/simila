@@ -61,8 +61,8 @@ type (
 		// but the force flag is false, the function will return ErrConflict error
 		DeleteNode(nID int64, force bool) error
 
-		// UpsertIndexRecords creates or updates index record entries
-		UpsertIndexRecords(records ...IndexRecord) error
+		// UpsertIndexRecords creates or updates index record entries. It returns the new records created
+		UpsertIndexRecords(records ...IndexRecord) (int, error)
 		// DeleteIndexRecords deletes index record entries
 		DeleteIndexRecords(records ...IndexRecord) (int, error)
 		// QueryIndexRecords lists query matching index record entries
