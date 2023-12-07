@@ -17,7 +17,7 @@ package api
 import (
 	"github.com/acquirecloud/golibs/cast"
 	"github.com/simila-io/simila/api/gen/format/v1"
-	"github.com/simila-io/simila/api/gen/index/v1"
+	"github.com/simila-io/simila/api/gen/index/v2"
 	similapi "github.com/simila-io/simila/api/genpublic/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -35,149 +35,136 @@ func toModelFormat(aFmt *format.Format) persistence.Format {
 	return persistence.Format{ID: aFmt.Name}
 }
 
-func toApiIndex(mIdx persistence.Index) *index.Index {
-	return &index.Index{
-		Id:        mIdx.ID,
-		Format:    mIdx.Format,
-		Tags:      mIdx.Tags,
-		CreatedAt: timestamppb.New(mIdx.CreatedAt),
-	}
-}
-
-func toModelIndex(aIdx *index.Index) persistence.Index {
-	if aIdx == nil {
-		return persistence.Index{}
-	}
-	return persistence.Index{ID: aIdx.Id, Format: aIdx.Format, Tags: aIdx.Tags}
-}
-
-func toModelIndexFromApiCreateIdxReq(request *index.CreateIndexRequest) persistence.Index {
-	if request == nil {
-		return persistence.Index{}
-	}
-	return persistence.Index{ID: request.Id, Tags: request.Tags, Format: request.Format}
-}
-
-func toApiSearchResultItem(mItem persistence.SearchQueryResultItem, includeScore bool) *index.SearchRecordsResultItem {
-	srr := &index.SearchRecordsResultItem{
-		IndexId:         mItem.IndexID,
-		IndexRecord:     toApiRecord(mItem.IndexRecord),
-		MatchedKeywords: mItem.MatchedKeywordsList,
-	}
-	if includeScore {
-		srr.Score = &mItem.Score
-	}
-	return srr
-}
-
-func toModelIndexRecordFromApiRecord(indexID string, aRec *index.Record) persistence.IndexRecord {
+func toModelIndexRecordFromApiRecord(nID int64, aRec *index.Record, defRankMul float64) persistence.IndexRecord {
 	if aRec == nil {
 		return persistence.IndexRecord{}
 	}
+	rm := float64(aRec.RankMultiplier)
+	if rm < 1.0 {
+		rm = defRankMul
+	}
 	return persistence.IndexRecord{
-		ID:      aRec.Id,
-		IndexID: indexID,
-		Segment: aRec.Segment,
-		Vector:  aRec.Vector,
+		ID:       aRec.Id,
+		NodeID:   nID,
+		Segment:  aRec.Segment,
+		RankMult: rm,
+		Vector:   aRec.Vector,
 	}
 }
 
-func toModelIndexRecordsFromApiRecords(idxId string, r []*index.Record) []persistence.IndexRecord {
+func toModelIndexRecordsFromApiRecords(nID int64, r []*index.Record, defRankMul float64) []persistence.IndexRecord {
 	if len(r) == 0 {
 		return nil
 	}
 	res := make([]persistence.IndexRecord, len(r))
 	for i, ir := range r {
-		res[i] = toModelIndexRecordFromApiRecord(idxId, ir)
+		res[i] = toModelIndexRecordFromApiRecord(nID, ir, defRankMul)
 	}
 	return res
+}
+
+func toApiNodes(nodes []persistence.Node) []*index.Node {
+	res := make([]*index.Node, len(nodes))
+	for i, n := range nodes {
+		res[i] = toApiNode(n)
+	}
+	return res
+}
+
+func toApiNode(node persistence.Node) *index.Node {
+	t := index.NodeType_FOLDER
+	if node.Flags&persistence.NODE_FLAG_DOCUMENT != 0 {
+		t = index.NodeType_DOCUMENT
+	}
+	return &index.Node{
+		Path: node.Path,
+		Name: node.Name,
+		Tags: node.Tags,
+		Type: t,
+	}
 }
 
 func toApiRecord(mRec persistence.IndexRecord) *index.Record {
 	return &index.Record{
-		Id:      mRec.ID,
-		Segment: mRec.Segment,
-		Vector:  mRec.Vector,
+		Id:             mRec.ID,
+		Segment:        mRec.Segment,
+		Vector:         mRec.Vector,
+		Format:         mRec.Format,
+		RankMultiplier: float32(mRec.RankMult),
 	}
 }
 
-func createIndexRequest2Proto(ci similapi.CreateIndexRequest) *index.CreateIndexRequest {
-	return &index.CreateIndexRequest{
-		Id:       ci.Id,
-		Format:   ci.Format,
-		Tags:     ci.Tags,
-		Document: ci.Document,
-		Records:  records2Proto(ci.Records),
-	}
-}
-
-func records2Proto(rs []similapi.Record) []*index.Record {
-	if len(rs) == 0 {
-		return nil
-	}
-	res := make([]*index.Record, len(rs))
-	for i, r := range rs {
-		res[i] = record2Proto(r)
+func toApiRecords(mRecs []persistence.IndexRecord) []*index.Record {
+	res := make([]*index.Record, len(mRecs))
+	for i, r := range mRecs {
+		res[i] = toApiRecord(r)
 	}
 	return res
 }
 
-func record2Proto(r similapi.Record) *index.Record {
-	return &index.Record{
-		Id:      r.Id,
-		Segment: r.Segment,
-		Vector:  r.Vector,
+func toApiSearchRecord(sr persistence.SearchQueryResultItem) *index.SearchRecordsResultItem {
+	res := &index.SearchRecordsResultItem{}
+	res.Record = toApiRecord(sr.IndexRecord)
+	res.Path = sr.Path
+	res.MatchedKeywords = sr.MatchedKeywordsList
+	res.Score = &sr.Score
+	return res
+}
+
+func toApiSearchRecords(srs []persistence.SearchQueryResultItem) []*index.SearchRecordsResultItem {
+	res := make([]*index.SearchRecordsResultItem, len(srs))
+	for i, sr := range srs {
+		res[i] = toApiSearchRecord(sr)
+	}
+	return res
+}
+
+func format2Rest(f *format.Format) similapi.Format {
+	return similapi.Format{Name: f.Name}
+}
+
+func formats2Rest(fs *format.Formats) similapi.Formats {
+	res := similapi.Formats{}
+	if fs == nil || len(fs.Formats) == 0 {
+		return res
+	}
+	res.Formats = make([]similapi.Format, len(fs.Formats))
+	for i, f := range fs.Formats {
+		res.Formats[i] = format2Rest(f)
+	}
+	return res
+}
+
+func searchRecordsRequest2Proto(sr similapi.SearchRecordsRequest) *index.SearchRecordsRequest {
+	return &index.SearchRecordsRequest{
+		Text:   sr.Text,
+		Tags:   sr.Tags,
+		Strict: cast.Ptr(sr.Strict),
+		Path:   sr.Path,
+		Offset: cast.Ptr(int64(sr.Offset)),
+		Limit:  cast.Ptr(int64(sr.Limit)),
 	}
 }
 
-func patchIndexRecordsRequest2Proto(pr similapi.PatchRecordsRequest) *index.PatchRecordsRequest {
-	return &index.PatchRecordsRequest{
-		Id:            pr.Id,
-		UpsertRecords: records2Proto(pr.UpsertRecords),
-		DeleteRecords: records2Proto(pr.DeleteRecords),
-	}
-}
-
-func patchIndexRecordsResult2Rest(prr *index.PatchRecordsResult) similapi.PatchRecordsResult {
-	return similapi.PatchRecordsResult{
-		Deleted:  int(prr.Deleted),
-		Upserted: int(prr.Upserted),
-	}
-}
-
-func searchRecordsResultItems2Rest(srr *index.SearchRecordsResultItem) similapi.SearchRecord {
-	return similapi.SearchRecord{
-		IndexRecord:     record2Rest(srr.IndexRecord),
-		IndexId:         srr.IndexId,
-		Score:           cast.Value(srr.Score, -1.0),
-		MatchedKeywords: srr.MatchedKeywords,
-	}
-}
-
-func searchRecordsResult2Rest(srr *indrecord2Restex.SearchRecordsResult) similapi.SearchResult {
-	res := similapi.SearchResult{}
+func searchRecordsResult2Rest(srr *index.SearchRecordsResult) similapi.SearchRecordsResult {
+	res := similapi.SearchRecordsResult{}
 	if srr == nil {
 		return res
 	}
-	res.Records = make([]similapi.SearchRecord, len(srr.Items))
+	res.Items = make([]similapi.SearchRecordsResultItem, len(srr.Items))
 	for i, sr := range srr.Items {
-		res.Records[i] = searchRecordsResultItems2Rest(sr)
+		res.Items[i] = searchRecordsResultItems2Rest(sr)
 	}
-	res.NextPageId = srr.NextPageId
 	res.Total = int(srr.Total)
 	return res
 }
 
-func searchRequest2Proto(sr similapi.SearchRequest) *index.SearchRecordsRequest {
-	return &index.SearchRecordsRequest{
-		Text:         sr.Text,
-		Tags:         sr.Tags,
-		Distinct:     cast.Ptr(sr.Distinct),
-		Limit:        cast.Ptr(int64(sr.Limit)),
-		PageId:       cast.Ptr(sr.PageId),
-		OrderByScore: cast.Ptr(sr.OrderByScore),
-		IndexIDs:     sr.IndexIDs,
-		Offset:       cast.Ptr(int64(sr.Offset)),
+func searchRecordsResultItems2Rest(srr *index.SearchRecordsResultItem) similapi.SearchRecordsResultItem {
+	return similapi.SearchRecordsResultItem{
+		Record:          record2Rest(srr.Record),
+		Path:            srr.Path,
+		Score:           cast.Value(srr.Score, -1.0),
+		MatchedKeywords: srr.MatchedKeywords,
 	}
 }
 
@@ -194,69 +181,69 @@ func records2Rest(rs []*index.Record) []similapi.Record {
 
 func record2Rest(r *index.Record) similapi.Record {
 	return similapi.Record{
-		Id:      r.Id,
-		Segment: r.Segment,
-		Vector:  r.Vector,
+		Id:             r.Id,
+		Segment:        r.Segment,
+		Vector:         r.Vector,
+		RankMultiplier: r.RankMultiplier,
+		Format:         r.Format,
 	}
 }
 
-func listRecordsResult2Rest(lrr *index.ListRecordsResult) similapi.RecordsResult {
-	if lrr == nil {
-		return similapi.RecordsResult{}
+func node2Rest(n *index.Node) similapi.Node {
+	if n == nil {
+		return similapi.Node{}
 	}
-	return similapi.RecordsResult{
-		Records:    records2Rest(lrr.Records),
-		NextPageId: lrr.NextRecordId,
-		Total:      int(lrr.Total),
+	tp := similapi.Folder
+	if n.Type == index.NodeType_DOCUMENT {
+		tp = similapi.Document
 	}
-}
-
-func index2Rest(r *index.Index) similapi.Index {
-	if r == nil {
-		return similapi.Index{}
-	}
-	return similapi.Index{
-		Id:        r.Id,
-		Format:    r.Format,
-		Tags:      r.Tags,
-		CreatedAt: protoTime2Time(r.CreatedAt),
+	return similapi.Node{
+		FullPath: n.Path,
+		Name:     n.Name,
+		Tags:     n.Tags,
+		Type:     tp,
 	}
 }
 
-func indexes2Rest(is *index.Indexes) similapi.Indexes {
-	res := similapi.Indexes{}
-	if is == nil {
-		return res
-	}
-	res.NextPageId = is.NextIndexId
-	res.Total = int(is.Total)
-	res.Indexes = make([]similapi.Index, len(is.Indexes))
-	for i, idx := range is.Indexes {
-		res.Indexes[i] = index2Rest(idx)
+func nodes2Rest(ns []*index.Node) []similapi.Node {
+	res := make([]similapi.Node, len(ns))
+	for i, n := range ns {
+		res[i] = node2Rest(n)
 	}
 	return res
 }
 
-func index2Proto(i similapi.Index) *index.Index {
-	return &index.Index{
-		Id:        i.Id,
-		Format:    i.Format,
-		Tags:      i.Tags,
-		CreatedAt: timestamppb.New(i.CreatedAt),
+func rest2Records(rs []similapi.Record) []*index.Record {
+	res := make([]*index.Record, len(rs))
+	for i, r := range rs {
+		res[i] = rest2Record(r)
 	}
-}
-func format2Rest(f *format.Format) similapi.Format {
-	return similapi.Format{Name: f.Name}
+	return res
 }
 
-func formats2Rest(fs *format.Formats) similapi.Formats {
-	res := similapi.Formats{}
-	if fs == nil || len(fs.Formats) == 0 {
-		return res
+func rest2Record(r similapi.Record) *index.Record {
+	return &index.Record{
+		Id:             r.Id,
+		Format:         r.Format,
+		Segment:        r.Segment,
+		Vector:         r.Vector,
+		RankMultiplier: r.RankMultiplier,
 	}
-	res.Formats = make([]similapi.Format, len(fs.Formats))
-	for i, f := range fs.Formats {
-		res.Formats[i] = format2Rest(f)
+}
+
+func rest2CreateRecordsRequest(path string, crr similapi.CreateRecordsRequest) *index.CreateRecordsRequest {
+	res := &index.CreateRecordsRequest{}
+	res.Records = rest2Records(crr.Records)
+	res.Path = path
+	res.Tags = crr.Tags
+	res.Document = crr.Document
+	res.RankMultiplier = crr.RankMultiplier
+	if crr.Parser != "" {
+		res.Parser = cast.Ptr(crr.Parser)
+	}
+	res.NodeType = cast.Ptr(index.NodeType_DOCUMENT)
+	if crr.NodeType == similapi.Folder {
+		res.NodeType = cast.Ptr(index.NodeType_FOLDER)
 	}
 	return res
 }

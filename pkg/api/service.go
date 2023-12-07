@@ -22,14 +22,14 @@ import (
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/simila-io/simila/api/gen/format/v1"
-	"github.com/simila-io/simila/api/gen/index/v1"
+	"github.com/simila-io/simila/api/gen/index/v2"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/simila-io/simila/pkg/parser"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
 )
 
-// Service implements the gRPC API endpoints
+// Service implements the gRPC API endpoints v1
 type (
 	Service struct {
 		PProvider parser.Provider `inject:""`
@@ -70,24 +70,28 @@ func (s *Service) FormatServiceServer() format.ServiceServer {
 	return s.fmtService
 }
 
-// createIndex allows to create a new index. The body represents a file stream,
+// createRecords allows to create a new index. The body represents a file stream,
 // if presents, body may be nil, then the body may be taken from the request.
-func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexRequest, body io.Reader) (*index.Index, error) {
-	s.logger.Infof("createIndex(): id=%s, format=%s, tags=%v records=%d, documentSize=%d, body?=%t", request.Id,
-		request.Format, request.Tags, len(request.Records), len(request.Document), body != nil)
+func (s *Service) createRecords(ctx context.Context, request *index.CreateRecordsRequest, body io.Reader) (*index.CreateRecordsResult, error) {
 	if request == nil {
-		return &index.Index{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
+		return &index.CreateRecordsResult{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
 	}
+
+	s.logger.Infof("createIndexRecords(): path=%s, nodeType=%s, tags=%v, parser=%s, rankMultiplier=%f, records=%d, document=%d, body=%t", request.Path,
+		cast.Value(request.NodeType, index.NodeType(0)), request.Tags, cast.Value(request.Parser, "N/A"), request.RankMultiplier,
+		len(request.Records), len(request.Document), body != nil)
 
 	var p parser.Parser
 	if body == nil && len(request.Document) > 0 {
 		body = bytes.NewReader(request.Document)
-		s.logger.Infof("createIndex(): will use Document for reading records")
+		s.logger.Infof("createIndexRecords(): will use Document for reading records")
 	}
+
 	if body != nil {
-		p = s.PProvider.Parser(request.Format)
+		parser := cast.Value(request.Parser, "")
+		p = s.PProvider.Parser(parser)
 		if p == nil {
-			return &index.Index{}, errors.GRPCWrap(fmt.Errorf("the format %s is not supported: %w", request.Format, errors.ErrInvalid))
+			return &index.CreateRecordsResult{}, errors.GRPCWrap(fmt.Errorf("the parser=%q is not supported: %w", parser, errors.ErrInvalid))
 		}
 	}
 
@@ -96,106 +100,144 @@ func (s *Service) createIndex(ctx context.Context, request *index.CreateIndexReq
 	defer func() {
 		_ = mtx.Rollback()
 	}()
+	res := &index.CreateRecordsResult{}
 
-	idx, err := mtx.CreateIndex(toModelIndexFromApiCreateIdxReq(request))
-	if err != nil {
-		return nil, errors.GRPCWrap(fmt.Errorf("could not create index with ID=%s: %w", request.Id, err))
+	pths := persistence.SplitPath(request.Path)
+	if len(pths) == 0 {
+		return &index.CreateRecordsResult{}, errors.GRPCWrap(fmt.Errorf("the path=%q should not be empty: %w", request.Path, errors.ErrInvalid))
 	}
-	if p != nil {
-		count, err := p.ScanRecords(ctx, mtx, request.Id, body)
+	nodes, err := mtx.ListNodes(request.Path)
+	if err != nil {
+		return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
+	}
+	n2c := nodes2Create(pths, nodes, cast.Value(request.NodeType, index.NodeType_FOLDER))
+	if len(n2c) > 0 {
+		nodes, err = mtx.CreateNodes(n2c...)
 		if err != nil {
-			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %q format: %w", request.Format, err))
+			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
 		}
-		s.logger.Infof("createIndex(): read %d records by parser %s for the new index %s", count, p, request.Id)
+		res.NodesCreated = &index.Nodes{
+			Nodes: toApiNodes(nodes),
+		}
+	}
+	node := nodes[len(nodes)-1]
+	if p != nil {
+		count, err := p.ScanRecords(ctx, mtx, node.ID, body)
+		if err != nil {
+			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %q format: %w", request.Parser, err))
+		}
+		s.logger.Infof("createRecords(): read %d records by parser %s for the node %q(%d)", count, p, persistence.ConcatPath(node.Path, node.Name), node.ID)
 	} else {
-		if err = mtx.UpsertIndexRecords(toModelIndexRecordsFromApiRecords(idx.ID, request.Records)...); err != nil {
-			return nil, errors.GRPCWrap(fmt.Errorf("could not create index records: %w", err))
+		rc, err := mtx.UpsertIndexRecords(toModelIndexRecordsFromApiRecords(node.ID, request.Records, 1.0)...)
+		if err != nil {
+			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
+		}
+		res.RecordsCreated = int64(rc)
+	}
+	_ = mtx.Commit()
+	return res, nil
+}
+
+func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.NodeType) []persistence.Node {
+	nodes2Create := []persistence.Node{}
+	if len(nodes) < len(pths) {
+		p := "/"
+		if len(nodes) > 0 {
+			n := nodes[len(nodes)-1]
+			p = persistence.ConcatPath(n.Path, n.Name)
+		}
+		for i := len(nodes); i < len(pths); i++ {
+			nodes2Create = append(nodes2Create, persistence.Node{Path: p, Name: pths[i]})
+			p = persistence.ConcatPath(p, pths[i])
+		}
+		if lastNodeType == index.NodeType_DOCUMENT {
+			nodes2Create[len(nodes2Create)-1].Flags = persistence.NODE_FLAG_DOCUMENT
 		}
 	}
-
-	_ = mtx.Commit()
-	return toApiIndex(idx), nil
+	return nodes2Create
 }
 
-func (s *Service) deleteIndex(ctx context.Context, id *index.Id) (*emptypb.Empty, error) {
-	s.logger.Infof("deleteIndex(): id=%s", id.GetId())
-	if id == nil {
-		return &emptypb.Empty{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
-	mtx := s.Db.NewModelTx(ctx)
-	if err := mtx.DeleteIndex((*id).Id); err != nil {
-		return &emptypb.Empty{}, errors.GRPCWrap(fmt.Errorf("could not delete index with ID=%v: %w", (*id).Id, err))
-	}
-	return &emptypb.Empty{}, nil
-}
-
-func (s *Service) getIndex(ctx context.Context, id *index.Id) (*index.Index, error) {
-	s.logger.Debugf("getIndex(): id=%s", id.GetId())
-	if id == nil {
-		return &index.Index{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
-	mtx := s.Db.NewModelTx(ctx)
-	idx, err := mtx.GetIndex((*id).Id)
-	if err != nil {
-		return &index.Index{}, errors.GRPCWrap(fmt.Errorf("could not get index with ID=%v: %w", (*id).Id, err))
-	}
-	return toApiIndex(idx), nil
-}
-
-func (s *Service) putIndex(ctx context.Context, idx *index.Index) (*index.Index, error) {
-	s.logger.Infof("putIndex(): id=%s", idx.Id)
-	if idx == nil {
-		return &index.Index{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
+func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) (*emptypb.Empty, error) {
+	s.logger.Infof("deleteNode(): path=%q, force=%t", path.Path, force)
 	mtx := s.Db.NewModelTx(ctx)
 	mtx.MustBegin()
 	defer func() {
 		_ = mtx.Rollback()
 	}()
-	if err := mtx.UpdateIndex(toModelIndex(idx)); err != nil {
-		return &index.Index{}, errors.GRPCWrap(err)
-	}
-	mIdx, err := mtx.GetIndex(idx.Id)
+	res := &emptypb.Empty{}
+	n, err := mtx.GetNode(path.Path)
 	if err != nil {
-		return &index.Index{}, errors.GRPCWrap(fmt.Errorf("could not update index=%v: %w", idx, err))
+		return res, errors.GRPCWrap(err)
 	}
-	_ = mtx.Commit()
-	return toApiIndex(mIdx), nil
+	err = mtx.DeleteNode(n.ID, force)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	mtx.Commit()
+	return res, nil
 }
 
-func (s *Service) listIndexes(ctx context.Context, request *index.ListRequest) (*index.Indexes, error) {
-	s.logger.Debugf("listIndexes(): %s", request)
-	if request == nil {
-		return &index.Indexes{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
-	qry := persistence.IndexQuery{
-		Format: cast.String(request.Format, ""),
-		Tags:   request.Tags,
-		FromID: request.StartIndexId,
-		Limit:  int(cast.Int64(request.Limit, 100)),
-	}
-	if request.CreatedAfter != nil {
-		qry.CreatedAfter = request.CreatedAfter.AsTime()
-	}
-	if request.CreatedBefore != nil {
-		qry.CreatedBefore = request.CreatedBefore.AsTime()
-	}
+func (s *Service) listNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
 	mtx := s.Db.NewModelTx(ctx)
-	mIdxs, err := mtx.QueryIndexes(qry)
+	res := &index.Nodes{}
+	nodes, err := mtx.ListNodes(path.Path)
 	if err != nil {
-		return &index.Indexes{}, errors.GRPCWrap(fmt.Errorf("indexes list query failed, request=%v: %w", request, err))
+		return res, errors.GRPCWrap(err)
 	}
-	aIdxs := make([]*index.Index, len(mIdxs.Items))
-	for i := 0; i < len(mIdxs.Items); i++ {
-		aIdxs[i] = toApiIndex(mIdxs.Items[i])
+	res.Nodes = toApiNodes(nodes)
+	return res, nil
+}
+
+func (s *Service) listRecords(ctx context.Context, request *index.ListRequest) (*index.ListRecordsResult, error) {
+	mtx := s.Db.NewModelTx(ctx)
+	res := &index.ListRecordsResult{}
+	q := persistence.IndexRecordQuery{
+		Format:        cast.Value(request.Format, ""),
+		CreatedAfter:  protoTime2Time(request.CreatedAfter),
+		CreatedBefore: protoTime2Time(request.CreatedBefore),
+		FromID:        cast.Value(request.PageId, ""),
 	}
-	res := &index.Indexes{Total: mIdxs.Total}
-	if len(aIdxs) > 0 {
-		res.Indexes = aIdxs
+	q.Limit = int(cast.Value(request.Limit, 100))
+	if q.Limit < 1 || q.Limit > 1000 {
+		q.Limit = 1000
 	}
-	if len(mIdxs.NextID) > 0 {
-		res.NextIndexId = &mIdxs.NextID
+	node, err := mtx.GetNode(request.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
 	}
+	q.NodeID = node.ID
+	qr, err := mtx.QueryIndexRecords(q)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	res.Total = qr.Total
+	if qr.NextID != "" {
+		res.NextPageId = &qr.NextID
+	}
+	res.Records = toApiRecords(qr.Items)
+	return res, nil
+}
+
+func (s *Service) search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
+	mtx := s.Db.NewModelTx(ctx)
+	res := &index.SearchRecordsResult{}
+	q := persistence.SearchQuery{
+		Path:   request.Path,
+		Query:  request.Text,
+		Tags:   request.Tags,
+		Strict: cast.Value(request.Strict, false),
+		Offset: int(cast.Value(request.Offset, 0)),
+		Limit:  int(cast.Value(request.Limit, 0)),
+	}
+	if q.Limit < 1 || q.Limit > 1000 {
+		q.Limit = 1000
+	}
+	qr, err := mtx.Search(q)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	res.Total = qr.Total
+	res.Items = toApiSearchRecords(qr.Items)
 	return res, nil
 }
 
@@ -209,89 +251,26 @@ func (s *Service) patchIndexRecords(ctx context.Context, request *index.PatchRec
 	defer func() {
 		_ = mtx.Rollback()
 	}()
-
-	addRecs := toModelIndexRecordsFromApiRecords(request.Id, request.UpsertRecords)
-	delRecs := toModelIndexRecordsFromApiRecords(request.Id, request.DeleteRecords)
-
-	err := mtx.UpsertIndexRecords(addRecs...)
+	res := &index.PatchRecordsResult{}
+	node, err := mtx.GetNode(request.Path)
 	if err != nil {
-		return &index.PatchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("index records patch(upsert) failed: %w", err))
+		return res, errors.GRPCWrap(err)
 	}
-	nDel, err := mtx.DeleteIndexRecords(delRecs...)
+
+	addRecs := toModelIndexRecordsFromApiRecords(node.ID, request.UpsertRecords, 1.0)
+	delRecs := toModelIndexRecordsFromApiRecords(node.ID, request.DeleteRecords, 1.0)
+
+	n, err := mtx.UpsertIndexRecords(addRecs...)
+	if err != nil {
+		return res, errors.GRPCWrap(fmt.Errorf("index records patch(upsert) failed: %w", err))
+	}
+	res.Upserted = n
+	n, err = mtx.DeleteIndexRecords(delRecs...)
 	if err != nil && !errors.Is(err, errors.ErrNotExist) {
-		return &index.PatchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("index records patch(delete) failed: %w", err))
+		return res, errors.GRPCWrap(fmt.Errorf("index records patch(delete) failed: %w", err))
 	}
+	res.Deleted = n
 	_ = mtx.Commit()
-	return &index.PatchRecordsResult{Upserted: int64(len(addRecs)), Deleted: int64(nDel)}, nil
-}
-
-func (s *Service) listIndexRecords(ctx context.Context, request *index.ListRecordsRequest) (*index.ListRecordsResult, error) {
-	s.logger.Debugf("listIndexRecords(): %s", request)
-	if request == nil {
-		return &index.ListRecordsResult{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
-	mtx := s.Db.NewModelTx(ctx)
-	qry := persistence.IndexRecordQuery{
-		FromID: cast.String(request.StartRecordId, ""),
-		Limit:  int(cast.Int64(request.Limit, 100)),
-	}
-	if len(request.Id) > 0 {
-		qry.IndexIDs = []string{request.Id}
-	}
-	mRecs, err := mtx.QueryIndexRecords(qry)
-	if err != nil {
-		return &index.ListRecordsResult{}, errors.GRPCWrap(fmt.Errorf("index records list query failed, request=%v: %w", request, err))
-	}
-	aRecs := make([]*index.Record, len(mRecs.Items))
-	for i := 0; i < len(mRecs.Items); i++ {
-		aRecs[i] = toApiRecord(mRecs.Items[i])
-	}
-	res := &index.ListRecordsResult{
-		Total: mRecs.Total,
-	}
-	if len(aRecs) > 0 {
-		res.Records = aRecs
-	}
-	if len(mRecs.NextID) > 0 {
-		res.NextRecordId = &mRecs.NextID
-	}
-	return res, nil
-}
-
-func (s *Service) searchRecords(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
-	s.logger.Debugf("searchRecords(): %s", request)
-	if request == nil {
-		return &index.SearchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
-	}
-	orderByScore := cast.Bool(request.OrderByScore, false)
-	qry := persistence.SearchQuery{
-		IndexIDs:     request.IndexIDs,
-		Query:        request.Text,
-		Tags:         request.Tags,
-		Distinct:     cast.Bool(request.Distinct, false),
-		OrderByScore: orderByScore,
-		FromID:       cast.String(request.PageId, ""),
-		Offset:       int(cast.Int64(request.Offset, 0)),
-		Limit:        int(cast.Int64(request.Limit, 100)),
-	}
-	mtx := s.Db.NewModelTx(ctx)
-	mRecs, err := mtx.Search(qry)
-	if err != nil {
-		return &index.SearchRecordsResult{}, errors.GRPCWrap(fmt.Errorf("index records search query failed, request=%v: %w", request, err))
-	}
-	aRecs := make([]*index.SearchRecordsResultItem, len(mRecs.Items))
-	for i := 0; i < len(mRecs.Items); i++ {
-		aRecs[i] = toApiSearchResultItem(mRecs.Items[i], orderByScore)
-	}
-	res := &index.SearchRecordsResult{
-		Total: mRecs.Total,
-	}
-	if len(aRecs) > 0 {
-		res.Items = aRecs
-	}
-	if len(mRecs.NextID) > 0 {
-		res.NextPageId = &mRecs.NextID
-	}
 	return res, nil
 }
 
@@ -348,43 +327,28 @@ func (s *Service) listFormat(ctx context.Context, _ *emptypb.Empty) (*format.For
 }
 
 // -------------------------- index.Service ---------------------------
-
-func (ids idxService) Create(ctx context.Context, request *index.CreateIndexRequest) (*index.Index, error) {
-	return ids.s.createIndex(ctx, request, nil)
+func (ids idxService) Create(ctx context.Context, request *index.CreateRecordsRequest) (*index.CreateRecordsResult, error) {
+	return ids.s.createRecords(ctx, request, nil)
 }
 
-func (ids idxService) Delete(ctx context.Context, id *index.Id) (*emptypb.Empty, error) {
-	return ids.s.deleteIndex(ctx, id)
+func (ids idxService) DeleteNode(ctx context.Context, path *index.Path) (*emptypb.Empty, error) {
+	return ids.s.deleteNode(ctx, path, true)
 }
 
-func (ids idxService) Get(ctx context.Context, id *index.Id) (*index.Index, error) {
-	return ids.s.getIndex(ctx, id)
+func (ids idxService) ListNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
+	return ids.s.listNodes(ctx, path)
 }
 
-func (ids idxService) Put(ctx context.Context, idx *index.Index) (*index.Index, error) {
-	return ids.s.putIndex(ctx, idx)
+func (ids idxService) ListRecords(ctx context.Context, request *index.ListRequest) (*index.ListRecordsResult, error) {
+	return ids.s.listRecords(ctx, request)
 }
 
-func (ids idxService) List(ctx context.Context, request *index.ListRequest) (*index.Indexes, error) {
-	return ids.s.listIndexes(ctx, request)
+func (ids idxService) Search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
+	return ids.s.search(ctx, request)
 }
 
 func (ids idxService) PatchRecords(ctx context.Context, request *index.PatchRecordsRequest) (*index.PatchRecordsResult, error) {
-	return ids.s.patchIndexRecords(ctx, request)
-}
-
-func (ids idxService) ListRecords(ctx context.Context, request *index.ListRecordsRequest) (*index.ListRecordsResult, error) {
-	return ids.s.listIndexRecords(ctx, request)
-}
-
-func (ids idxService) SearchRecords(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
-	return ids.s.searchRecords(ctx, request)
-}
-
-// ----------------------------- format.Service ---------------------------------
-
-func (fs fmtService) Create(ctx context.Context, f *format.Format) (*format.Format, error) {
-	return fs.s.createFormat(ctx, f)
+	return ids.PatchRecords(ctx, request)
 }
 
 func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStreamDataServer) error {
@@ -422,11 +386,16 @@ func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStream
 			err = nil
 		}
 	}()
-	idx, err := ids.s.createIndex(server.Context(), req.Meta, r)
+	idx, err := ids.s.createRecords(server.Context(), req.Meta, r)
 	if err == nil {
 		server.SendAndClose(idx)
 	}
 	return err
+}
+
+// ----------------------------- format.Service ---------------------------------
+func (fs fmtService) Create(ctx context.Context, f *format.Format) (*format.Format, error) {
+	return fs.s.createFormat(ctx, f)
 }
 
 func (fs fmtService) Get(ctx context.Context, id *format.Id) (*format.Format, error) {
