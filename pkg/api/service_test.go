@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/simila-io/simila/api/gen/index/v2"
+	"github.com/simila-io/simila/api/gen/index/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/stretchr/testify/assert"
 	"testing"

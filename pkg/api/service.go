@@ -22,7 +22,7 @@ import (
 	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/simila-io/simila/api/gen/format/v1"
-	"github.com/simila-io/simila/api/gen/index/v2"
+	"github.com/simila-io/simila/api/gen/index/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"github.com/simila-io/simila/pkg/parser"
 	"google.golang.org/protobuf/types/known/emptypb"

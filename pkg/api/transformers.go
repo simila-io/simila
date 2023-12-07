@@ -17,7 +17,7 @@ package api
 import (
 	"github.com/acquirecloud/golibs/cast"
 	"github.com/simila-io/simila/api/gen/format/v1"
-	"github.com/simila-io/simila/api/gen/index/v2"
+	"github.com/simila-io/simila/api/gen/index/v1"
 	similapi "github.com/simila-io/simila/api/genpublic/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"google.golang.org/protobuf/types/known/timestamppb"
