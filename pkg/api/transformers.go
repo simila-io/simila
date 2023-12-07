@@ -154,7 +154,7 @@ func searchRecordsResultItems2Rest(srr *index.SearchRecordsResultItem) similapi.
 	}
 }
 
-func searchRecordsResult2Rest(srr *index.SearchRecordsResult) similapi.SearchResult {
+func searchRecordsResult2Rest(srr *indrecord2Restex.SearchRecordsResult) similapi.SearchResult {
 	res := similapi.SearchResult{}
 	if srr == nil {
 		return res

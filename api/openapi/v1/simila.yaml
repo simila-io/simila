@@ -441,9 +441,6 @@ components:
           description: The found index records.
           items:
             $ref: '#/components/schemas/SearchRecordsResultItem'
-        nextPageId:
-          type: string
-          description: The id of the next page for getting the rest of the records.
         total:
           type: integer
           description: The total number of found records.

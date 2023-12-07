@@ -15,8 +15,10 @@
 package api
 
 import (
+	"github.com/acquirecloud/golibs/cast"
 	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v2"
+	similapi "github.com/simila-io/simila/api/genpublic/v1"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -113,6 +115,100 @@ func toApiSearchRecords(srs []persistence.SearchQueryResultItem) []*index.Search
 	res := make([]*index.SearchRecordsResultItem, len(srs))
 	for i, sr := range srs {
 		res[i] = toApiSearchRecord(sr)
+	}
+	return res
+}
+
+func format2Rest(f *format.Format) similapi.Format {
+	return similapi.Format{Name: f.Name}
+}
+
+func formats2Rest(fs *format.Formats) similapi.Formats {
+	res := similapi.Formats{}
+	if fs == nil || len(fs.Formats) == 0 {
+		return res
+	}
+	res.Formats = make([]similapi.Format, len(fs.Formats))
+	for i, f := range fs.Formats {
+		res.Formats[i] = format2Rest(f)
+	}
+	return res
+}
+
+func searchRecordsRequest2Proto(sr similapi.SearchRecordsRequest) *index.SearchRecordsRequest {
+	return &index.SearchRecordsRequest{
+		Text:   sr.Text,
+		Tags:   sr.Tags,
+		Strict: cast.Ptr(sr.Strict),
+		Path:   sr.Path,
+		Offset: cast.Ptr(int64(sr.Offset)),
+		Limit:  cast.Ptr(int64(sr.Limit)),
+	}
+}
+
+func searchRecordsResult2Rest(srr *index.SearchRecordsResult) similapi.SearchRecordsResult {
+	res := similapi.SearchRecordsResult{}
+	if srr == nil {
+		return res
+	}
+	res.Items = make([]similapi.SearchRecordsResultItem, len(srr.Items))
+	for i, sr := range srr.Items {
+		res.Items[i] = searchRecordsResultItems2Rest(sr)
+	}
+	res.Total = int(srr.Total)
+	return res
+}
+
+func searchRecordsResultItems2Rest(srr *index.SearchRecordsResultItem) similapi.SearchRecordsResultItem {
+	return similapi.SearchRecordsResultItem{
+		Record:          record2Rest(srr.Record),
+		Path:            srr.Path,
+		Score:           cast.Value(srr.Score, -1.0),
+		MatchedKeywords: srr.MatchedKeywords,
+	}
+}
+
+func records2Rest(rs []*index.Record) []similapi.Record {
+	if len(rs) == 0 {
+		return nil
+	}
+	res := make([]similapi.Record, len(rs))
+	for i, r := range rs {
+		res[i] = record2Rest(r)
+	}
+	return res
+}
+
+func record2Rest(r *index.Record) similapi.Record {
+	return similapi.Record{
+		Id:             r.Id,
+		Segment:        r.Segment,
+		Vector:         r.Vector,
+		RankMultiplier: r.RankMultiplier,
+		Format:         r.Format,
+	}
+}
+
+func node2Rest(n *index.Node) similapi.Node {
+	if n == nil {
+		return similapi.Node{}
+	}
+	tp := similapi.Folder
+	if n.Type == index.NodeType_DOCUMENT {
+		tp = similapi.Document
+	}
+	return similapi.Node{
+		FullPath: n.Path,
+		Name:     n.Name,
+		Tags:     n.Tags,
+		Type:     tp,
+	}
+}
+
+func nodes2Rest(ns []*index.Node) []similapi.Node {
+	res := make([]similapi.Node, len(ns))
+	for i, n := range ns {
+		res[i] = node2Rest(n)
 	}
 	return res
 }
