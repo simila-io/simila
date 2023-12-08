@@ -106,7 +106,7 @@ func serve(ctx context.Context, path string, sc index.ServiceClient) {
 		for fn := range curFiles {
 			if _, ok := seen[fn]; !ok {
 				logger.Infof("the file %s seems to be removed from the folder ", fn)
-				if _, err := sc.Delete(ctx, &index.Id{Id: fn}); err != nil && !errors.Is(err, errors.ErrNotExist) {
+				if _, err := sc.DeleteNode(ctx, &index.Path{Path: fn}); err != nil && !errors.Is(err, errors.ErrNotExist) {
 					logger.Errorf("coud not delete the index %s: %s", fn, err)
 					continue
 				}
@@ -123,7 +123,7 @@ func uploadfile(ctx context.Context, dir string, fi os.FileInfo, sc index.Servic
 		if errors.Is(err, errors.ErrExist) {
 			fn := fi.Name()
 			logger.Infof("the index with id=%s already exists, let's delete it and rescan ", fn)
-			if _, err = sc.Delete(ctx, &index.Id{Id: fn}); err != nil {
+			if _, err = sc.DeleteNode(ctx, &index.Path{Path: fn}); err != nil {
 				return err
 			}
 			continue
@@ -142,7 +142,7 @@ func uploadfile2(ctx context.Context, dir string, fi os.FileInfo, sc index.Servi
 	}
 	defer f.Close()
 
-	cir := &index.CreateIndexRequest{Id: fn, Format: ext}
+	crr := &index.CreateRecordsRequest{Path: fn, Parser: cast.Ptr(ext)}
 	buf := make([]byte, 4096)
 	stream, err := sc.CreateWithStreamData(ctx)
 	if err != nil {
@@ -154,11 +154,11 @@ func uploadfile2(ctx context.Context, dir string, fi os.FileInfo, sc index.Servi
 		if err != nil {
 			break
 		}
-		err = stream.Send(&index.CreateIndexStreamRequest{Meta: cir, Data: buf[:n]})
+		err = stream.Send(&index.CreateIndexStreamRequest{Meta: crr, Data: buf[:n]})
 		if err != nil {
 			break
 		}
-		cir = nil
+		crr = nil
 	}
 	_, err = stream.CloseAndRecv()
 	return err
