@@ -66,6 +66,8 @@ create table if not exists "index_record"
     primary key ("node_id", "id")
 );
 
+create index if not exists "idx_index_record_node_id" on "index_record" ("node_id");
+create index if not exists "idx_index_record_format" on "index_record" ("format");
 create index if not exists "idx_index_record_vector" on "index_record" using gin ("vector");
 create index if not exists "idx_index_record_created_at" on "index_record" ("created_at");
 `
