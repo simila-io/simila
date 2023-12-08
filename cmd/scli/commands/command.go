@@ -32,11 +32,15 @@ type (
 		cs *Commands
 	}
 
-	cmdListIndexes struct {
+	cmdListRecords struct {
 		cs *Commands
 	}
 
 	cmdSearch struct {
+		cs *Commands
+	}
+
+	cmdListNodes struct {
 		cs *Commands
 	}
 )
@@ -48,8 +52,9 @@ const (
 func New(ctx context.Context, isc index.ServiceClient) *Commands {
 	cs := &Commands{ctx: ctx, isc: isc}
 	cs.cmds = append(cs.cmds, cmdHelp{cs: cs})
-	cs.cmds = append(cs.cmds, cmdListIndexes{cs: cs})
+	cs.cmds = append(cs.cmds, cmdListRecords{cs: cs})
 	cs.cmds = append(cs.cmds, cmdSearch{cs: cs})
+	cs.cmds = append(cs.cmds, cmdListNodes{cs: cs})
 	return cs
 }
 
@@ -107,21 +112,16 @@ func (c cmdHelp) Prefix() string {
 	return "help"
 }
 
-// -------------------------------- cmdListIndexes ---------------------------------
-func (c cmdListIndexes) Run(prompt string) error {
+// -------------------------------- cmdListRecords ---------------------------------
+func (c cmdListRecords) Run(prompt string) error {
 	req := &index.ListRequest{}
 	var asTable bool
 	params := parseParams(prompt)
+
 	for k, v := range params {
 		switch k {
-		case "startIndex":
-			req.StartIndexId = strings.Trim(v, Spaces)
-		case "tags":
-			tags := map[string]string{}
-			if err := json.Unmarshal(cast.StringToByteArray(v), &tags); err != nil {
-				return fmt.Errorf("the tags value %q is wrong. Expecting tags to be a json map", v)
-			}
-			req.Tags = tags
+		case "path":
+			req.Path = strings.Trim(v, Spaces)
 		case "format":
 			req.Format = cast.Ptr(strings.Trim(v, Spaces))
 		case "limit":
@@ -130,6 +130,8 @@ func (c cmdListIndexes) Run(prompt string) error {
 				return fmt.Errorf("the limit value %s is wrong. limit must be a positive number", v)
 			}
 			req.Limit = cast.Ptr(int64(limit))
+		case "page-id":
+			req.PageId = cast.Ptr(strings.Trim(v, Spaces))
 		case "as-table":
 			if err := json.Unmarshal(cast.StringToByteArray(v), &asTable); err != nil {
 				return fmt.Errorf("the as-table value %s is wrong. It must be a boolean value true/false", v)
@@ -139,65 +141,61 @@ func (c cmdListIndexes) Run(prompt string) error {
 		}
 	}
 
-	indexes, err := c.cs.isc.List(c.cs.ctx, req)
+	records, err := c.cs.isc.ListRecords(c.cs.ctx, req)
 	if err != nil {
 		return err
 	}
 	if asTable {
-		c.printAsTable(indexes)
+		c.printAsTable(records)
 	} else {
-		b, _ := json.MarshalIndent(indexes, "", "  ")
+		b, _ := json.MarshalIndent(records, "", "  ")
 		fmt.Println(string(b))
 	}
 	return nil
 }
 
-func (c cmdListIndexes) printAsTable(idx *index.Indexes) {
+func (c cmdListRecords) printAsTable(lrr *index.ListRecordsResult) {
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgYellow).SprintfFunc()
 
-	tbl := table.New("Id", "Format", "Tags", "CreatedAt")
+	tbl := table.New("Id", "Format", "RM", "Segment", "Vector")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
-	for _, r := range idx.Indexes {
-		tags := "{}"
-		if len(r.Tags) > 0 {
-			b, _ := json.Marshal(r.Tags)
-			tags = string(b)
-		}
+	for _, r := range lrr.Records {
 		tbl.AddRow(
 			r.Id,
 			r.Format,
-			tags,
-			r.CreatedAt.AsTime(),
+			r.RankMultiplier,
+			r.Segment,
+			r.Vector,
 		)
 	}
 
 	tbl.Print()
-	if idx.NextIndexId != nil && *idx.NextIndexId != "" {
-		fmt.Println("NextIndexId: ", *idx.NextIndexId)
+	if lrr.NextPageId != nil && *lrr.NextPageId != "" {
+		fmt.Println("NextPageId: ", *lrr.NextPageId)
 	}
-	fmt.Println("Total: ", idx.Total)
+	fmt.Println("Total: ", lrr.Total)
 }
 
-func (c cmdListIndexes) shortDescription() string {
-	return "list indexes <params> - allows to request index list"
+func (c cmdListRecords) shortDescription() string {
+	return "list records <params> - allows to request index records for a path"
 }
 
-func (c cmdListIndexes) description() string {
+func (c cmdListRecords) description() string {
 	return `
-list indexes <params> - lists the known indexes. It accepts the following params:
+list records <params> - lists the known index records for a path. It accepts the following params:
 
-	startIndex=<string> - the first index in the result
-	tags={"a":"a", "b":"b"} - the indexes with the tags values
+	path=<string> - FQNP - fully qualified node path
 	format=<string> - the indexes for the format
 	limit=<int> - the number of records in the response
-	as-table=<bool> - prints the result in a table for
+	as-table=<bool> - prints the result in a table 
+	page-id=<string> - next page if needed
 `
 }
 
-func (c cmdListIndexes) Prefix() string {
-	return "list indexes"
+func (c cmdListRecords) Prefix() string {
+	return "list records"
 }
 
 // -------------------------------- cmdSearch ---------------------------------
@@ -215,24 +213,20 @@ func (c cmdSearch) Run(prompt string) error {
 				return fmt.Errorf("the tags value %q is wrong. Expecting tags to be a json map", v)
 			}
 			req.Tags = tags
-		case "indexes":
-			var idxs []string
-			if err := json.Unmarshal(cast.StringToByteArray(v), &idxs); err != nil {
-				return fmt.Errorf("the list of indexes %q is wrong. Expecting a json list of strings", v)
-			}
-			req.IndexIDs = idxs
+		case "path":
+			req.Path = strings.Trim(v, Spaces)
 		case "limit":
 			var limit int
 			if err := json.Unmarshal(cast.StringToByteArray(v), &limit); err != nil || limit <= 0 {
 				return fmt.Errorf("the limit value %s is wrong. limit must be a positive number", v)
 			}
 			req.Limit = cast.Ptr(int64(limit))
-		case "distinct":
+		case "strict":
 			var dist bool
 			if err := json.Unmarshal(cast.StringToByteArray(v), &dist); err != nil {
-				return fmt.Errorf("the distinct value %s is wrong. distinct must be a boolean value true/false", v)
+				return fmt.Errorf("the strict value %s is wrong. distinct must be a boolean value true/false", v)
 			}
-			req.Distinct = cast.Ptr(dist)
+			req.Strict = cast.Ptr(dist)
 		case "as-table":
 			if err := json.Unmarshal(cast.StringToByteArray(v), &asTable); err != nil {
 				return fmt.Errorf("the as-table value %s is wrong. It must be a boolean value true/false", v)
@@ -241,8 +235,7 @@ func (c cmdSearch) Run(prompt string) error {
 			return fmt.Errorf("unexpected parameter %s", k)
 		}
 	}
-	req.OrderByScore = cast.Ptr(true)
-	result, err := c.cs.isc.SearchRecords(c.cs.ctx, req)
+	result, err := c.cs.isc.Search(c.cs.ctx, req)
 	if err != nil {
 		return err
 	}
@@ -259,15 +252,15 @@ func (c cmdSearch) printAsTable(srr *index.SearchRecordsResult) {
 	headerFmt := color.New(color.FgGreen, color.Underline).SprintfFunc()
 	//columnFmt := color.New(color.FgYellow).SprintfFunc()
 
-	tbl := table.New("Score", "IdxId", "Keywords", "Segment")
+	tbl := table.New("Score", "Path", "Keywords", "Segment")
 	tbl.WithHeaderFormatter(headerFmt)
 
 	for _, r := range srr.Items {
 		tbl.AddRow(
 			cutStr(fmt.Sprintf("%.2f", cast.Value(r.Score, -1.0)), 5),
-			cutStr(r.IndexId, 16),
+			cutStr(r.Path, 16),
 			cutStr(fmt.Sprintf("%v", r.MatchedKeywords), 40),
-			cutToKeyword(r.IndexRecord.Segment, r.MatchedKeywords[0], 80),
+			cutToKeyword(r.Record.Segment, r.MatchedKeywords[0], 80),
 		)
 	}
 
@@ -294,7 +287,7 @@ func cutStr(s string, maxLen int) string {
 }
 
 func (c cmdSearch) shortDescription() string {
-	return "search <params> - run the search request across known indexes"
+	return "search <params> - run the search request across known index records"
 }
 
 func (c cmdSearch) description() string {
@@ -303,8 +296,8 @@ search <params> - returns the search results. It accepts the following params:
 
 	text=<string> - the query text
 	tags={"a":"a", "b":"b"} - the indexes with the tags values
-	indexes=["index1", "index2"] - the list of indexes to run the search through
-	distinct=<bool> - one record per index in the result
+	path=<string> - FQNP the path to the node to run the search for
+	strict=<bool> - run the search for the node only (excluding its children, if any)
 	limit=<int> - the number of records in the response
 	as-table=<bool> - prints the result in a table form
 `
@@ -312,6 +305,31 @@ search <params> - returns the search results. It accepts the following params:
 
 func (c cmdSearch) Prefix() string {
 	return "search"
+}
+
+// -------------------------------- cmdListNodes ----------------------------------
+func (c cmdListNodes) Run(prompt string) error {
+	nodes, err := c.cs.isc.ListNodes(c.cs.ctx, &index.Path{Path: prompt})
+	if err != nil {
+		return err
+	}
+	b, _ := json.MarshalIndent(nodes, "", "  ")
+	fmt.Println(string(b))
+	return nil
+}
+
+func (c cmdListNodes) shortDescription() string {
+	return "ls <path> - list nodes for the path"
+}
+
+func (c cmdListNodes) description() string {
+	return `
+ls <path> - prints all nodes for the path. The path is a FQNP to the node, whose children nodes should be printed
+`
+}
+
+func (c cmdListNodes) Prefix() string {
+	return "ls"
 }
 
 func parseParams(s string) map[string]string {
