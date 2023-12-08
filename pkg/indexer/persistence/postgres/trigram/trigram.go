@@ -148,7 +148,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, n persistence.Node, q p
 			") as r "+
 			"inner join index_record on index_record.node_id = r.node_id and "+
 			"((1 - (segment <->> $%d))*rank_multiplier) = r.score "+
-			"order by score desc, path "+
+			"order by score desc, path, id "+
 			"offset $%d limit $%d", qryArg, where, qryArg, offArg, limArg)
 	}
 

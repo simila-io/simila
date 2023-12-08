@@ -168,7 +168,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, n persistence.Node, q p
 			") as r "+
 			"inner join index_record on index_record.node_id = r.node_id and "+
 			"(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) = r.score "+
-			"order by score desc, path "+
+			"order by score desc, path, id "+
 			"offset $%d limit $%d", qryArg, kwFmt, qryArg, where, qryArg, offArg, limArg)
 	}
 

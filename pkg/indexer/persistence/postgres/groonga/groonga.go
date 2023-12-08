@@ -139,7 +139,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, n persistence.Node, q p
 			") as r "+
 			"inner join index_record on index_record.node_id = r.node_id and "+
 			"(pgroonga_score(index_record.tableoid, index_record.ctid)*rank_multiplier) = r.score "+
-			"order by score desc, path "+
+			"order by score desc, path, id "+
 			"offset $%d limit $%d", qryArg, where, offArg, limArg)
 	}
 
