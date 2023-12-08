@@ -59,6 +59,9 @@ type (
 		RankMult  float64   `db:"rank_multiplier"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
+
+		// search module specific fields
+		SegmentTsVector string `db:"segment_tsvector"`
 	}
 
 	IndexRecordQuery struct {
@@ -78,7 +81,7 @@ type (
 		Tags  Tags   // index tags
 		// Strict defines the search records behavior:
 		// - If true, the search will select between all records associated with the Path node only (Path == "PathXName" for the Node with <PathX, Name> pair)
-		// - if false, the search will select between records in the Path subtree for all records there (every Node which's path has Path prefix),
+		// - If false, the search will select between records in the Path subtree for all records there (every Node where path has Path prefix),
 		// but only one most relevant record per one node (one record per <PathX, Name> pair)
 		Strict bool
 		Offset int
@@ -87,10 +90,15 @@ type (
 
 	SearchQueryResultItem struct {
 		IndexRecord
-		Path                string
+		Path                string   `db:"path"`
 		MatchedKeywordsList []string // mapped manually after filling the MatchedKeywords
 		MatchedKeywords     string   `db:"matched_keywords"`
 		Score               float32  `db:"score"`
+	}
+
+	SearchQueryResult struct {
+		Items []SearchQueryResultItem
+		Total int64
 	}
 
 	QueryResult[T any, N any] struct {
@@ -101,7 +109,8 @@ type (
 )
 
 const (
-	NODE_FLAG_DOCUMENT = 1 // if it is set, it is a document. If not set, it is a folder
+	NodeFlagFolder   = 0
+	NodeFlagDocument = 1 // if it is set, it is a document. If not set, it is a folder
 )
 
 func (t Tags) Value() (value driver.Value, err error) {

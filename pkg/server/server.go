@@ -18,7 +18,7 @@ import (
 	"context"
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/simila-io/simila/api/gen/format/v1"
-	"github.com/simila-io/simila/api/gen/index/v2"
+	"github.com/simila-io/simila/api/gen/index/v1"
 	"github.com/simila-io/simila/pkg/api"
 	"github.com/simila-io/simila/pkg/grpc"
 	"github.com/simila-io/simila/pkg/http"

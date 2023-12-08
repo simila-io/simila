@@ -38,7 +38,51 @@ func Path(names []string) string {
 	return sb.String()
 }
 
-// ConcatPath allows to concat two pathes
+// ConcatPath allows to concat two paths
 func ConcatPath(p1, p2 string) string {
 	return filepath.Clean("/" + p1 + "/" + p2)
+}
+
+// ToNodePath returns the path in a form as expected by Node
+func ToNodePath(path string) string {
+	parts := SplitPath(path)
+	if len(parts) == 0 {
+		return "/"
+	}
+	path = Path(parts)
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+	return path
+}
+
+// ToNodePathName returns the path and name parts of the given path as expected by Node
+func ToNodePathName(path string) (string, string) { // path, name
+	parts := SplitPath(path)
+	if len(parts) == 0 {
+		return "/", ""
+	}
+	path = Path(parts[:len(parts)-1])
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+	return path, strings.TrimSpace(parts[len(parts)-1])
+}
+
+// ToNodePathNamePairs returns all the possible {path, name} pairs along the given path as expected by Node
+func ToNodePathNamePairs(path string) [][]string {
+	pairs := make([][]string, 0)
+	parts := SplitPath(path)
+
+	var sb strings.Builder
+	sb.WriteString("/")
+
+	for i := 0; i < len(parts); i++ {
+		if i > 0 {
+			sb.WriteString(parts[i-1])
+			sb.WriteString("/")
+		}
+		pairs = append(pairs, []string{sb.String(), parts[i]})
+	}
+	return pairs
 }

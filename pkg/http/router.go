@@ -64,6 +64,8 @@ func (r *Router) PostConstruct() {
 func (r *Router) Init(_ context.Context) error {
 	r.logger.Infof("Initializing")
 	r.r = gin.Default()
+	r.r.UseRawPath = true
+	r.r.UnescapePathValues = false
 
 	if r.config.RestRegistrar == nil {
 		r.logger.Warnf("RestRegistrar is not provided, will register /ping only...")

@@ -47,6 +47,7 @@ func toModelIndexRecordFromApiRecord(nID int64, aRec *index.Record, defRankMul f
 		ID:       aRec.Id,
 		NodeID:   nID,
 		Segment:  aRec.Segment,
+		Format:   aRec.Format,
 		RankMult: rm,
 		Vector:   aRec.Vector,
 	}
@@ -73,7 +74,7 @@ func toApiNodes(nodes []persistence.Node) []*index.Node {
 
 func toApiNode(node persistence.Node) *index.Node {
 	t := index.NodeType_FOLDER
-	if node.Flags&persistence.NODE_FLAG_DOCUMENT != 0 {
+	if node.Flags&persistence.NodeFlagDocument != 0 {
 		t = index.NodeType_DOCUMENT
 	}
 	return &index.Node{
@@ -198,10 +199,10 @@ func node2Rest(n *index.Node) similapi.Node {
 		tp = similapi.Document
 	}
 	return similapi.Node{
-		FullPath: n.Path,
-		Name:     n.Name,
-		Tags:     n.Tags,
-		Type:     tp,
+		Path: n.Path,
+		Name: n.Name,
+		Tags: n.Tags,
+		Type: tp,
 	}
 }
 

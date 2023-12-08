@@ -46,22 +46,26 @@ type (
 		// ListFormats lists all the existing format entries
 		ListFormats() ([]Format, error)
 
-		// CreateNodes allows to create one or several new Nodes. If a Node with the path already exists, the function will return
-		// ErrExists.
+		// CreateNodes allows to create one or several new Nodes. If a Node with the path already exists,
+		// the function will return ErrExists.
 		CreateNodes(nodes ...Node) ([]Node, error)
-		// ListNodes returns all nodes for the path. For example for the path="/a/b/doc.txt" the result nodes will be
-		// {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
+		// ListNodes returns all nodes for the path. For example for the path="/a/b/doc.txt"
+		// the result nodes will be {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
 		ListNodes(path string) ([]Node, error)
 		// ListChildren returns the children for the path: all nodes of the 1st level with the path prefix in Path
 		//
-		// Example: for the nodes={<"/", "a">, <"/a/", "c">, <"/a/", "b">, <"/a/b/", "cc">} the result for the "/a/" will be {<"/a/", "c">, <"/a/", "b">}
+		// Example: for the nodes={<"/", "a">, <"/a/", "c">, <"/a/", "b">, <"/a/b/", "cc">}
+		// the result for the "/a/" will be {<"/a/", "c">, <"/a/", "b">}
 		ListChildren(path string) ([]Node, error)
 
-		// GetNode returns the node by its fqpn
-		GetNode(fqpn string) (Node, error)
+		// GetNode returns the node by its fqnp
+		GetNode(fqnp string) (Node, error)
 		// DeleteNode deletes the Node and all records associated with the Node.
 		// force allows to delete folder nodes with children. If the node is folder, and there are children,
 		// but the force flag is false, the function will return ErrConflict error
+		//
+		// NOTE: The operation is not atomic until an external transaction is not started,
+		// the caller MUST start the transaction before using this method.
 		DeleteNode(nID int64, force bool) error
 
 		// UpsertIndexRecords creates or updates index record entries. It returns the new records created
@@ -74,7 +78,10 @@ type (
 		// Search performs search across existing index records
 		// the query string should be formed in accordance with the query
 		// language of the underlying search engine
-		Search(query SearchQuery) (QueryResult[SearchQueryResultItem, string], error)
+		//
+		// NOTE: The operation is not atomic until an external transaction is not started,
+		// the caller MUST start the transaction before using this method.
+		Search(query SearchQuery) (SearchQueryResult, error)
 	}
 
 	// Db interface exposes

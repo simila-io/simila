@@ -80,6 +80,7 @@ func (cs *Commands) GetCommand(prompt string) (Command, error) {
 }
 
 // -------------------------------- cmdHelp ----------------------------------
+
 func (c cmdHelp) Run(prompt string) error {
 	for _, c := range c.cs.cmds {
 		if strings.HasPrefix(prompt, c.Prefix()) {
@@ -113,6 +114,7 @@ func (c cmdHelp) Prefix() string {
 }
 
 // -------------------------------- cmdListRecords ---------------------------------
+
 func (c cmdListRecords) Run(prompt string) error {
 	req := &index.ListRequest{}
 	var asTable bool
@@ -199,6 +201,7 @@ func (c cmdListRecords) Prefix() string {
 }
 
 // -------------------------------- cmdSearch ---------------------------------
+
 func (c cmdSearch) Run(prompt string) error {
 	req := &index.SearchRecordsRequest{}
 	var asTable bool
@@ -308,6 +311,7 @@ func (c cmdSearch) Prefix() string {
 }
 
 // -------------------------------- cmdListNodes ----------------------------------
+
 func (c cmdListNodes) Run(prompt string) error {
 	nodes, err := c.cs.isc.ListNodes(c.cs.ctx, &index.Path{Path: prompt})
 	if err != nil {

@@ -124,7 +124,7 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 	if p != nil {
 		count, err := p.ScanRecords(ctx, mtx, node.ID, body)
 		if err != nil {
-			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %q format: %w", request.Parser, err))
+			return nil, errors.GRPCWrap(fmt.Errorf("could not read records for %q format: %w", cast.String(request.Parser, ""), err))
 		}
 		s.logger.Infof("createRecords(): read %d records by parser %s for the node %q(%d)", count, p, persistence.ConcatPath(node.Path, node.Name), node.ID)
 	} else {
@@ -151,7 +151,7 @@ func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.No
 			p = persistence.ConcatPath(p, pths[i])
 		}
 		if lastNodeType == index.NodeType_DOCUMENT {
-			nodes2Create[len(nodes2Create)-1].Flags = persistence.NODE_FLAG_DOCUMENT
+			nodes2Create[len(nodes2Create)-1].Flags = persistence.NodeFlagDocument
 		}
 	}
 	return nodes2Create
@@ -180,7 +180,7 @@ func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) 
 func (s *Service) listNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
 	mtx := s.Db.NewModelTx(ctx)
 	res := &index.Nodes{}
-	nodes, err := mtx.ListNodes(path.Path)
+	nodes, err := mtx.ListChildren(path.Path)
 	if err != nil {
 		return res, errors.GRPCWrap(err)
 	}
@@ -220,6 +220,10 @@ func (s *Service) listRecords(ctx context.Context, request *index.ListRequest) (
 
 func (s *Service) search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
 	mtx := s.Db.NewModelTx(ctx)
+	mtx.MustBegin()
+	defer func() {
+		_ = mtx.Rollback()
+	}()
 	res := &index.SearchRecordsResult{}
 	q := persistence.SearchQuery{
 		Path:   request.Path,
@@ -238,6 +242,7 @@ func (s *Service) search(ctx context.Context, request *index.SearchRecordsReques
 	}
 	res.Total = qr.Total
 	res.Items = toApiSearchRecords(qr.Items)
+	_ = mtx.Commit()
 	return res, nil
 }
 
@@ -327,6 +332,7 @@ func (s *Service) listFormat(ctx context.Context, _ *emptypb.Empty) (*format.For
 }
 
 // -------------------------- index.Service ---------------------------
+
 func (ids idxService) Create(ctx context.Context, request *index.CreateRecordsRequest) (*index.CreateRecordsResult, error) {
 	return ids.s.createRecords(ctx, request, nil)
 }
@@ -348,7 +354,7 @@ func (ids idxService) Search(ctx context.Context, request *index.SearchRecordsRe
 }
 
 func (ids idxService) PatchRecords(ctx context.Context, request *index.PatchRecordsRequest) (*index.PatchRecordsResult, error) {
-	return ids.PatchRecords(ctx, request)
+	return ids.s.patchIndexRecords(ctx, request)
 }
 
 func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStreamDataServer) error {
@@ -394,6 +400,7 @@ func (ids idxService) CreateWithStreamData(server index.Service_CreateWithStream
 }
 
 // ----------------------------- format.Service ---------------------------------
+
 func (fs fmtService) Create(ctx context.Context, f *format.Format) (*format.Format, error) {
 	return fs.s.createFormat(ctx, f)
 }
