@@ -79,28 +79,25 @@ func main() {
 func serve(ctx context.Context, path string, sc index.ServiceClient) {
 	logger.Infof("start scanning %s", path)
 	defer logger.Infof("end scanning %s", path)
-	curFiles := map[string]os.FileInfo{}
+	curFiles := map[string]int64{}
 	for ctx.Err() == nil {
 		seen := map[string]bool{}
-		fis := files.ListDir(path)
-		for _, fi := range fis {
-			if fi.IsDir() || !strings.HasSuffix(fi.Name(), ".txt") {
+		fis := scanTxtFiles(path)
+		for fn, sz := range fis {
+			seen[fn] = true
+			curSz, ok := curFiles[fn]
+			if ok && curSz == sz {
 				continue
 			}
-			cf, ok := curFiles[fi.Name()]
-			seen[fi.Name()] = true
-			if ok && cf.Size() == fi.Size() {
+			if err := uploadfile(ctx, path, fn, sc); err != nil {
+				logger.Errorf("could not upload file %s to the server: %s", fn, err)
 				continue
 			}
-			if err := uploadfile(ctx, path, fi, sc); err != nil {
-				logger.Errorf("could not upload file %s to the server: %s", fi.Name(), err)
-				continue
-			}
-			curFiles[fi.Name()] = fi
+			curFiles[fn] = sz
 			if !ok {
-				logger.Infof("found the new file %s and uploaded successfully", fi.Name())
+				logger.Infof("found the new file %s and uploaded successfully", fn)
 			} else {
-				logger.Infof("the file %s was updated successfully", fi.Name())
+				logger.Infof("the file %s was updated successfully", fn)
 			}
 		}
 		for fn := range curFiles {
@@ -117,11 +114,29 @@ func serve(ctx context.Context, path string, sc index.ServiceClient) {
 	}
 }
 
-func uploadfile(ctx context.Context, dir string, fi os.FileInfo, sc index.ServiceClient) error {
+func scanTxtFiles(path string) map[string]int64 {
+	res := make(map[string]int64)
+	fis := files.ListDir(path)
+	for _, fi := range fis {
+		if fi.IsDir() {
+			sf := scanTxtFiles(filepath.Join(path, fi.Name()))
+			for n, s := range sf {
+				res[filepath.Join(fi.Name(), n)] = s
+			}
+			continue
+		}
+		if !strings.HasSuffix(fi.Name(), ".txt") {
+			continue
+		}
+		res[fi.Name()] = fi.Size()
+	}
+	return res
+}
+
+func uploadfile(ctx context.Context, dir string, fn string, sc index.ServiceClient) error {
 	for {
-		err := uploadfile2(ctx, dir, fi, sc)
+		err := uploadfile2(ctx, dir, fn, sc)
 		if errors.Is(err, errors.ErrExist) {
-			fn := fi.Name()
 			logger.Infof("the index with id=%s already exists, let's delete it and rescan ", fn)
 			if _, err = sc.DeleteNode(ctx, &index.Path{Path: fn}); err != nil {
 				return err
@@ -132,8 +147,7 @@ func uploadfile(ctx context.Context, dir string, fi os.FileInfo, sc index.Servic
 	}
 }
 
-func uploadfile2(ctx context.Context, dir string, fi os.FileInfo, sc index.ServiceClient) error {
-	fn := fi.Name()
+func uploadfile2(ctx context.Context, dir string, fn string, sc index.ServiceClient) error {
 	ext := fn[len(fn)-3:]
 	f, err := os.Open(filepath.Join(dir, fn))
 	if err != nil {
