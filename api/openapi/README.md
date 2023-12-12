@@ -4,29 +4,30 @@ This folder contains [simila.yaml](v1/simila.yaml) file in [OpenAPI](https://www
 ## Conventions
 Whoever makes changes in the public API should follow the conventions described here.
 
-### Routes(endpoints)
+**NOTE:** The verbs, nouns, etc. used in the example API paths below are just for example and do not relate to the actual Simila API.
+
+### Routes (endpoints)
 We are going to follow conventions described [here](https://restfulapi.net/resource-naming/). Which in shorts means the following:
 * A route consists of resources which are plural nouns:
-    ```
-  GET /v1/indexes/...
-  GET /v1/formats/:id/...
-  ```
+```
+  GET /v1/organizations/...
+```
 * In some cases more than one word may be needed for a route, this case we use kebab style:
 ```
-  POST /v1/users/:id/reset-password/...
+  POST /v1/organizations/{id}/some-action/...
 ```
 * A resource name is followed by the resource identifier:
-    ```
-  GET /v1/indexes/1234
-  PUT /v1/indexes/1234
-  ```
+```
+  GET /v1/organizations/{id}/...
+  PUT /v1/organizations/123
+```
 * Instead of a resource name could be a verb, which means the action. This action can be executed by `POST` method:
 ```
-    POST /v1/search
+  POST /v1/action
 ```
 * The resource names and action verbs are lowercases - one word
 
-### Models(objects)
+### Models (objects)
 A model describes a structure of the object in JSON format. The fields in the model should be camelCased starting from lowercase. Examples:
 ```
     "id": ...

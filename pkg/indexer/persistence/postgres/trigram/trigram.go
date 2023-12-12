@@ -3,7 +3,6 @@ package trigram
 import (
 	"context"
 	"fmt"
-	"github.com/acquirecloud/golibs/errors"
 	"github.com/acquirecloud/golibs/strutil"
 	"github.com/jmoiron/sqlx"
 	migrate "github.com/rubenv/sql-migrate"
@@ -69,122 +68,86 @@ func SessionParams() map[string]any {
 // Queries are just text, no expressions are supported for now, the whole
 // segment of text is matched against the whole query text using `trigram word similarity`,
 // see https://www.postgresql.org/docs/current/pgtrgm.html.
-func Search(ctx context.Context, q sqlx.QueryerContext, query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
-	if len(query.Query) == 0 {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
-	}
-	sb := strings.Builder{}
-	args := make([]any, 0)
+func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
+	var params []any
+	var sb strings.Builder
 
-	if len(query.FromID) > 0 {
-		var fromID persistence.IndexRecordID
-		if err := fromID.Decode(query.FromID); err != nil {
-			return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, fmt.Errorf("invalid FromID: %w", errors.ErrInvalid)
-		}
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" index_record.index_id >= ? and index_record.id >= ? ")
-		args = append(args, fromID.IndexID, fromID.RecordID)
-	}
-	if len(query.IndexIDs) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		oldLen := len(args)
-		sb.WriteString(" index_record.index_id in ( ")
-		for _, id := range query.IndexIDs {
-			if len(args) > oldLen {
-				sb.WriteString(", ")
-			}
-			sb.WriteString("?")
-			args = append(args, id)
-		}
-		sb.WriteString(")")
-	}
-	if len(query.Tags) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		var tb strings.Builder
-		tb.WriteString(" {")
-		oldLen := tb.Len()
-		for k, v := range query.Tags {
-			if tb.Len() > oldLen {
-				tb.WriteByte(',')
-			}
-			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
-		}
-		tb.WriteString("}")
-		sb.WriteString(" index.tags @> ?")
-		args = append(args, tb.String())
-	}
-	if len(query.Query) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" index_record.segment %> ? ")
-		args = append(args, query.Query)
-	}
+	sb.WriteString(fmt.Sprintf(" segment %%> $%d ", len(params)+1))
+	params = append(params, q.Query)
 
-	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	if len(where) > 0 {
-		where = " where " + where
-	}
+	var count string
+	var query string
 
-	distinct := ""
-	if query.Distinct {
-		if query.OrderByScore {
-			distinct = "distinct on(score, index_record.index_id)"
-		} else {
-			distinct = "distinct on(index_record.index_id)"
-		}
-	}
+	qrPrm := len(params)
+	if q.Strict { // search records of a node with path+name == q.Path
+		path, name := persistence.ToNodePathName(q.Path)
+		sb.WriteString(fmt.Sprintf(" and node_id = (select id from node "+
+			"where path = $%d and name = $%d and tags @> $%d) ", len(params)+1, len(params)+2, len(params)+3))
+		params = append(params, path, name, q.Tags.JSON())
 
-	orderBy, limit := "", 0
-	if query.OrderByScore {
-		orderBy = "order by score desc, index_record.index_id asc, index_record.id asc"
-		limit = query.Limit // no +1, since no pagination
-	} else {
-		orderBy = "order by index_record.index_id asc, index_record.id asc"
-		limit = query.Limit + 1
+		where := sb.String()
+		count = fmt.Sprintf("select count(*) from index_record "+
+			"inner join node as n on n.id = node_id where %s", where)
+
+		query = fmt.Sprintf("select index_record.*, "+
+			"concat(n.path, n.name) as path, "+
+			"((1 - (segment <->> $%d))*rank_multiplier) as score "+
+			"from index_record "+
+			"inner join node as n on n.id = node_id "+
+			"where %s "+
+			"order by score desc, id "+
+			"offset $%d limit $%d", qrPrm, where, len(params)+1, len(params)+2)
+
+	} else { // search records of nodes whose path starts with q.Path
+		sb.WriteString(fmt.Sprintf(" and node_id in (select id from node "+
+			"where path like concat($%d::text, '%%') and tags @> $%d) ", len(params)+1, len(params)+2))
+		params = append(params, persistence.ToNodePath(q.Path), q.Tags.JSON())
+
+		where := sb.String()
+		count = fmt.Sprintf("select count(distinct node_id) from index_record "+
+			"inner join node as n on n.id = node_id where %s", where)
+
+		query = fmt.Sprintf("select distinct on(score, path) index_record.*, "+
+			"concat(n.path, n.name) as path, "+
+			"r.score as score "+
+			"from ("+
+			//
+			"select node_id, "+
+			"max((1 - (segment <->> $%d))*rank_multiplier) as score "+
+			"from index_record "+
+			"where %s "+
+			"group by node_id"+
+			//
+			") as r "+
+			"inner join index_record on index_record.node_id = r.node_id and "+
+			"((1 - (segment <->> $%d))*rank_multiplier) = r.score "+
+			"inner join node as n on n.id = r.node_id "+
+			"order by score desc, path, id "+
+			"offset $%d limit $%d", qrPrm, where, qrPrm, len(params)+1, len(params)+2)
 	}
 
 	// count
-	args = append(args, query.Query)
-	total, err := persistence.Count(ctx, q, fmt.Sprintf("select count(*) "+
-		"from (select %s index_record.*, 1.0 - (index_record.segment <->> $%d) as score "+
-		"from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s) as r", distinct, len(args), where, orderBy), args...)
+	total, err := persistence.Count(ctx, qx, count, params...)
 	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
+		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
 
 	// query
-	if query.Limit <= 0 {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Total: total}, nil
+	if q.Limit <= 0 {
+		return persistence.SearchQueryResult{Total: total}, nil
 	}
-	args = append(args, query.Offset, limit)
-	rows, err := q.QueryxContext(ctx, fmt.Sprintf("select %s index_record.*, "+
-		"1 - (index_record.segment <->> $%d) as score "+
-		"from index_record "+
-		"inner join index on index.id = index_record.index_id %s %s offset $%d limit $%d",
-		distinct, len(args)-2, where, orderBy, len(args)-1, len(args)), args...)
+	params = append(params, q.Offset, q.Limit)
+	rows, err := qx.QueryxContext(ctx, query, params...)
 	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
+		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
 
 	// results
-	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywordsToListFn(query.Query))
+	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywordsToListFn(q.Query))
 	if err != nil {
-		return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, persistence.MapError(err)
+		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
-	var nextID persistence.IndexRecordID
-	if len(res) > query.Limit {
-		nextID = persistence.IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
-		res = res[:query.Limit]
-	}
-	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
+	return persistence.SearchQueryResult{Items: res, Total: total}, nil
 }
 
 func mapKeywordsToListFn(query string) func(item persistence.SearchQueryResultItem) persistence.SearchQueryResultItem {

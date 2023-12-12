@@ -36,8 +36,7 @@ type (
 	}
 
 	// SearchFn is used to provide different search implementations
-	SearchFn func(ctx context.Context, q sqlx.QueryerContext,
-		query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error)
+	SearchFn func(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error)
 
 	// exec is a helper interface to provide joined functionality of sqlx.DB and sqlx.Tx
 	// it is used by the tx.executor()
@@ -207,47 +206,112 @@ func (m *modelTx) ListFormats() ([]persistence.Format, error) {
 	return persistence.ScanRows[persistence.Format](rows)
 }
 
-func (m *modelTx) CreateIndex(index persistence.Index) (persistence.Index, error) {
-	if len(index.ID) == 0 {
-		return persistence.Index{}, fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
+func (m *modelTx) CreateNodes(nodes ...persistence.Node) ([]persistence.Node, error) {
+	if len(nodes) == 0 {
+		return nil, nil
 	}
-	if index.Tags == nil {
-		index.Tags = make(persistence.Tags)
+
+	var sb strings.Builder
+	var params []any
+
+	firstIdx := 1
+	sb.WriteString("insert into node (path, name, tags, flags, created_at, updated_at) values ")
+	now := time.Now()
+
+	for i, n := range nodes {
+		if len(n.Path) == 0 {
+			return nil, fmt.Errorf("node path for item=%d must be specified: %w", i, errors.ErrInvalid)
+		}
+		if len(n.Name) == 0 {
+			return nil, fmt.Errorf("node name for item=%d must be specified: %w", i, errors.ErrInvalid)
+		}
+		if n.Tags == nil {
+			n.Tags = make(persistence.Tags)
+		}
+		if i > 0 {
+			sb.WriteString(",")
+		}
+
+		sb.WriteString(fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", firstIdx, firstIdx+1, firstIdx+2, firstIdx+3, firstIdx+4, firstIdx+5))
+		firstIdx += 6
+
+		params = append(params, persistence.ToNodePath(n.Path))
+		params = append(params, strings.TrimSpace(n.Name))
+		params = append(params, n.Tags)
+		params = append(params, n.Flags)
+		params = append(params, now)
+		params = append(params, now)
 	}
-	index.CreatedAt = time.Now()
-	index.UpdatedAt = index.CreatedAt
-	_, err := m.executor().ExecContext(m.ctx, "insert into index (id, format, tags, created_at, updated_at) values ($1, $2, $3, $4, $5)",
-		index.ID, index.Format, index.Tags, index.CreatedAt, index.UpdatedAt)
+	sb.WriteString(" returning *")
+	rows, err := m.executor().QueryxContext(m.ctx, sb.String(), params...)
 	if err != nil {
-		return persistence.Index{}, persistence.MapError(err)
+		return nil, persistence.MapError(err)
 	}
-	return index, nil
+	defer rows.Close()
+	return persistence.ScanRows[persistence.Node](rows)
 }
 
-func (m *modelTx) GetIndex(ID string) (persistence.Index, error) {
-	var idx persistence.Index
-	return idx, persistence.MapError(m.executor().GetContext(m.ctx, &idx, "select * from index where id=$1", ID))
+func (m *modelTx) ListNodes(path string) ([]persistence.Node, error) {
+	var sb strings.Builder
+	var args []any
+
+	for _, p := range persistence.ToNodePathNamePairs(path) {
+		if sb.Len() > 0 {
+			sb.WriteString(" or ")
+		}
+		sb.WriteString("(path = ? and name = ?)")
+		args = append(args, p[0], p[1])
+	}
+	if sb.Len() == 0 {
+		return nil, nil
+	}
+
+	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name", where), args...)
+	if err != nil {
+		return nil, persistence.MapError(err)
+	}
+	defer rows.Close()
+	return persistence.ScanRows[persistence.Node](rows)
 }
 
-func (m *modelTx) UpdateIndex(index persistence.Index) error {
-	if len(index.ID) == 0 {
-		return fmt.Errorf("index ID must be specified: %w", errors.ErrInvalid)
+func (m *modelTx) ListChildren(path string) ([]persistence.Node, error) {
+	rows, err := m.executor().QueryxContext(m.ctx, "select * from node where path = $1 order by path, name", persistence.ToNodePath(path))
+	if err != nil {
+		return nil, persistence.MapError(err)
+	}
+	defer rows.Close()
+	return persistence.ScanRows[persistence.Node](rows)
+}
+
+func (m *modelTx) GetNode(fqnp string) (persistence.Node, error) {
+	path, name := persistence.ToNodePathName(fqnp)
+	var node persistence.Node
+	if err := m.executor().GetContext(m.ctx, &node, "select * from node where path=$1 and name = $2", path, name); err != nil {
+		return persistence.Node{}, persistence.MapError(err)
+	}
+	return node, nil
+}
+
+func (m *modelTx) UpdateNode(node persistence.Node) error {
+	if node.ID == 0 {
+		return fmt.Errorf("node ID must be specified: %w", errors.ErrInvalid)
 	}
 
 	sb := strings.Builder{}
-	sb.WriteString("update index set")
+	sb.WriteString("update node set")
 
-	args := make([]any, 0)
-	if len(index.Tags) > 0 {
+	var args []any
+	if len(node.Tags) > 0 {
 		sb.WriteString(" tags = ?")
-		args = append(args, index.Tags)
+		args = append(args, node.Tags.JSON())
 	}
 	if len(args) == 0 {
 		return nil
 	}
 
 	sb.WriteString(", updated_at = ? where id = ?")
-	args = append(args, time.Now(), index.ID)
+	args = append(args, time.Now(), node.ID)
 
 	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
 	if err != nil {
@@ -260,8 +324,26 @@ func (m *modelTx) UpdateIndex(index persistence.Index) error {
 	return nil
 }
 
-func (m *modelTx) DeleteIndex(ID string) error {
-	res, err := m.executor().ExecContext(m.ctx, "delete from index where id=$1", ID)
+func (m *modelTx) DeleteNode(nID int64, force bool) error {
+	if !force {
+		childCount, err := persistence.Count(m.ctx, m.executor(),
+			"select count (*) "+
+				"from node, (select * from node where id = $1) as n "+
+				"where n.flags = $2 and node.path like concat(n.path, n.name, '/', '%%')",
+			nID, persistence.NodeFlagFolder)
+		if err != nil {
+			return persistence.MapError(err)
+		}
+		if childCount > 0 {
+			return fmt.Errorf("delete node with ID=%d failed (force=%t), "+
+				"the node has children: %w", nID, force, errors.ErrConflict)
+		}
+	}
+	res, err := m.executor().ExecContext(m.ctx,
+		"delete from node "+
+			"using (select * from node where id = $1) as n "+
+			"where node.id = n.id or (n.flags = $2 and node.path like concat(n.path, n.name, '/', '%%'))",
+		nID, persistence.NodeFlagFolder)
 	if err != nil {
 		return persistence.MapError(err)
 	}
@@ -272,9 +354,101 @@ func (m *modelTx) DeleteIndex(ID string) error {
 	return nil
 }
 
-func (m *modelTx) QueryIndexes(query persistence.IndexQuery) (persistence.QueryResult[persistence.Index, string], error) {
+func (m *modelTx) UpsertIndexRecords(records ...persistence.IndexRecord) (int64, error) {
+	if len(records) == 0 {
+		return 0, nil
+	}
+
+	var sb strings.Builder
+	var params []any
+
+	firstIdx := 1
+	sb.WriteString("insert into index_record (id, node_id, segment, vector, format, rank_multiplier, created_at, updated_at) values ")
+	now := time.Now()
+	for i, r := range records {
+		if len(r.ID) == 0 {
+			return 0, fmt.Errorf("record ID for item=%d  must be specified: %w", i, errors.ErrInvalid)
+		}
+		if r.NodeID == 0 {
+			return 0, fmt.Errorf("record node ID for item=%d must be specified: %w", i, errors.ErrInvalid)
+		}
+		if len(r.Format) == 0 {
+			return 0, fmt.Errorf("record format for item=%d must be specified: %w", i, errors.ErrInvalid)
+		}
+		if r.RankMult <= 0 {
+			r.RankMult = 1.0
+		}
+		if len(r.Vector) == 0 {
+			r.Vector = []byte("{}")
+		}
+		if i > 0 {
+			sb.WriteString(",")
+		}
+
+		sb.WriteString(fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", firstIdx, firstIdx+1, firstIdx+2, firstIdx+3, firstIdx+4, firstIdx+5, firstIdx+6, firstIdx+7))
+		firstIdx += 8
+
+		params = append(params, r.ID)
+		params = append(params, r.NodeID)
+		params = append(params, r.Segment)
+		params = append(params, r.Vector)
+		params = append(params, r.Format)
+		params = append(params, r.RankMult)
+		params = append(params, now)
+		params = append(params, now)
+	}
+	sb.WriteString(" on conflict (node_id,id) " +
+		"do update set (segment, vector, format, rank_multiplier, updated_at) = " +
+		"(excluded.segment, excluded.vector, excluded.format, excluded.rank_multiplier, excluded.updated_at)")
+	res, err := m.executor().ExecContext(m.ctx, sb.String(), params...)
+	if err != nil {
+		return 0, persistence.MapError(err)
+	}
+	cnt, _ := res.RowsAffected()
+	return cnt, nil
+}
+
+func (m *modelTx) DeleteIndexRecords(records ...persistence.IndexRecord) (int64, error) {
+	if len(records) == 0 {
+		return 0, nil
+	}
+
+	var sb strings.Builder
+	var args []any
+
+	for _, r := range records {
+		if sb.Len() > 0 {
+			sb.WriteString(" or ")
+		}
+		sb.WriteString("(node_id = ? and id = ?)")
+		args = append(args, r.NodeID, r.ID)
+	}
+	if sb.Len() == 0 {
+		return 0, nil
+	}
+
+	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
+	res, err := m.executor().ExecContext(m.ctx, fmt.Sprintf("delete from index_record where %s", where), args...)
+	if err != nil {
+		return 0, persistence.MapError(err)
+	}
+	cnt, _ := res.RowsAffected()
+	if cnt == 0 {
+		return 0, errors.ErrNotExist
+	}
+	return cnt, nil
+}
+
+func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persistence.QueryResult[persistence.IndexRecord, string], error) {
+	if query.NodeID == 0 {
+		return persistence.QueryResult[persistence.IndexRecord, string]{}, fmt.Errorf("node ID must be specified: %w", errors.ErrInvalid)
+	}
+
 	sb := strings.Builder{}
+	sb.WriteString(" node_id = ? ")
+
 	args := make([]any, 0)
+	args = append(args, query.NodeID)
 
 	if len(query.FromID) > 0 {
 		if len(args) > 0 {
@@ -290,23 +464,6 @@ func (m *modelTx) QueryIndexes(query persistence.IndexQuery) (persistence.QueryR
 		sb.WriteString(" format = ? ")
 		args = append(args, query.Format)
 	}
-	if len(query.Tags) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		var tb strings.Builder
-		tb.WriteString(" {")
-		oldLen := tb.Len()
-		for k, v := range query.Tags {
-			if tb.Len() > oldLen {
-				tb.WriteByte(',')
-			}
-			tb.WriteString(fmt.Sprintf("%q:%q", k, v))
-		}
-		tb.WriteString("}")
-		sb.WriteString(" tags @> ?")
-		args = append(args, tb.String())
-	}
 	if !query.CreatedBefore.IsZero() {
 		if len(args) > 0 {
 			sb.WriteString(" and ")
@@ -322,220 +479,9 @@ func (m *modelTx) QueryIndexes(query persistence.IndexQuery) (persistence.QueryR
 		args = append(args, query.CreatedAfter)
 	}
 
-	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	if len(where) > 0 {
-		where = " where " + where
-	}
-
-	// count
-	total, err := persistence.Count(m.ctx, m.executor(), fmt.Sprintf("select count(*) from index %s", where), args...)
-	if err != nil {
-		return persistence.QueryResult[persistence.Index, string]{}, persistence.MapError(err)
-	}
-
-	// query
-	if query.Limit <= 0 {
-		return persistence.QueryResult[persistence.Index, string]{Total: total}, nil
-	}
-	args = append(args, query.Limit+1)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index %s order by id limit $%d", where, len(args)), args...)
-	if err != nil {
-		return persistence.QueryResult[persistence.Index, string]{Total: total}, persistence.MapError(err)
-	}
-
-	// results
-	res, err := persistence.ScanRowsQueryResult[persistence.Index](rows)
-	if err != nil {
-		return persistence.QueryResult[persistence.Index, string]{}, persistence.MapError(err)
-	}
-	var nextID string
-	if len(res) > query.Limit {
-		nextID = res[len(res)-1].ID
-		res = res[:query.Limit]
-	}
-	return persistence.QueryResult[persistence.Index, string]{Items: res, NextID: nextID, Total: total}, nil
-}
-
-func (m *modelTx) UpsertIndexRecords(records ...persistence.IndexRecord) error {
-	if len(records) == 0 {
-		return nil
-	}
-
-	var sb strings.Builder
-	var params []any
-
-	firstIdx := 1
-	sb.WriteString("insert into index_record (id, index_id, segment, vector, created_at, updated_at) values ")
-	now := time.Now()
-	for i, r := range records {
-		if len(r.ID) == 0 {
-			return fmt.Errorf("record ID for item=%d  must be specified: %w", i, errors.ErrInvalid)
-		}
-		if len(r.IndexID) == 0 {
-			return fmt.Errorf("record index ID for item=%d must be specified: %w", i, errors.ErrInvalid)
-		}
-		if len(r.Vector) == 0 {
-			r.Vector = []byte("{}")
-		}
-		if i > 0 {
-			sb.WriteString(",")
-		}
-
-		sb.WriteString(fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", firstIdx, firstIdx+1, firstIdx+2, firstIdx+3, firstIdx+4, firstIdx+5))
-		firstIdx += 6
-
-		params = append(params, r.ID)
-		params = append(params, r.IndexID)
-		params = append(params, r.Segment)
-		params = append(params, r.Vector)
-		params = append(params, now)
-		params = append(params, now)
-	}
-	sb.WriteString(" on conflict (index_id,id) do update set (segment, vector, updated_at) = (excluded.segment, excluded.vector, excluded.updated_at)")
-	if _, err := m.executor().ExecContext(m.ctx, sb.String(), params...); err != nil {
-		return persistence.MapError(err)
-	}
-	return nil
-}
-
-func (m *modelTx) GetIndexRecord(ID, indexID string) (persistence.IndexRecord, error) {
-	if len(ID) == 0 {
-		return persistence.IndexRecord{}, fmt.Errorf("record ID must be specified: %w", errors.ErrInvalid)
-	}
-	if len(indexID) == 0 {
-		return persistence.IndexRecord{}, fmt.Errorf("record index ID must be specified: %w", errors.ErrInvalid)
-	}
-
-	var r persistence.IndexRecord
-	return r, persistence.MapError(m.executor().GetContext(m.ctx, &r, "select * FROM index_record WHERE index_id=$1 and id=$2", indexID, ID))
-}
-
-func (m *modelTx) UpdateIndexRecord(record persistence.IndexRecord) error {
-	if len(record.ID) == 0 {
-		return fmt.Errorf("record ID must be specified: %w", errors.ErrInvalid)
-	}
-	if len(record.IndexID) == 0 {
-		return fmt.Errorf("record index ID must be specified: %w", errors.ErrInvalid)
-	}
-
-	sb := strings.Builder{}
-	sb.WriteString("update index_record set")
-
-	args := make([]interface{}, 0)
-	if len(record.Segment) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString(" segment = ?")
-		args = append(args, record.Segment)
-	}
-	if len(record.Vector) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString(" vector = ?")
-		args = append(args, record.Vector)
-	}
-	if len(args) == 0 {
-		return nil
-	}
-
-	sb.WriteString(", updated_at = ? where index_id = ? and id = ?")
-	args = append(args, time.Now(), record.IndexID, record.ID)
-
-	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
-	if err != nil {
-		return persistence.MapError(err)
-	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		return errors.ErrNotExist
-	}
-	return nil
-}
-
-func (m *modelTx) DeleteIndexRecords(records ...persistence.IndexRecord) (int, error) {
-	if len(records) == 0 {
-		return 0, nil
-	}
-
-	recIDs := make([]string, len(records))
-	idxIDs := make([]string, len(records))
-
-	for i := 0; i < len(records); i++ {
-		if len(records[i].ID) == 0 {
-			return 0, fmt.Errorf("record ID for item=%d  must be specified: %w", i, errors.ErrInvalid)
-		}
-		if len(records[i].IndexID) == 0 {
-			return 0, fmt.Errorf("record index ID for item=%d must be specified: %w", i, errors.ErrInvalid)
-		}
-		recIDs[i] = records[i].ID
-		idxIDs[i] = records[i].IndexID
-	}
-
-	idsList, idsArgs, _ := sqlx.In("?", recIDs)
-	idxIDsList, idxIDsArgs, _ := sqlx.In("?", idxIDs)
-
-	qry := fmt.Sprintf("delete from index_record where index_id in (%s) and id in (%s)", idxIDsList, idsList)
-	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, qry), append(idxIDsArgs, idsArgs...)...)
-	if err != nil {
-		return 0, persistence.MapError(err)
-	}
-	cnt, _ := res.RowsAffected()
-	if cnt == 0 {
-		return 0, errors.ErrNotExist
-	}
-	return int(cnt), nil
-}
-
-func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persistence.QueryResult[persistence.IndexRecord, string], error) {
-	sb := strings.Builder{}
-	args := make([]any, 0)
-
-	if len(query.FromID) > 0 {
-		var fromID persistence.IndexRecordID
-		if err := fromID.Decode(query.FromID); err != nil {
-			return persistence.QueryResult[persistence.IndexRecord, string]{}, fmt.Errorf("invalid FromID: %w", errors.ErrInvalid)
-		}
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" index_record.index_id >= ? and index_record.id >= ? ")
-		args = append(args, fromID.IndexID, fromID.RecordID)
-	}
-	if len(query.IndexIDs) > 0 {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		oldLen := len(args)
-		sb.WriteString(" index_id in ( ")
-		for _, id := range query.IndexIDs {
-			if len(args) > oldLen {
-				sb.WriteString(", ")
-			}
-			sb.WriteString("?")
-			args = append(args, id)
-		}
-		sb.WriteString(")")
-	}
-	if !query.CreatedBefore.IsZero() {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" created_at < ? ")
-		args = append(args, query.CreatedBefore)
-	}
-	if !query.CreatedAfter.IsZero() {
-		if len(args) > 0 {
-			sb.WriteString(" and ")
-		}
-		sb.WriteString(" created_at > ? ")
-		args = append(args, query.CreatedAfter)
-	}
-
-	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	if len(where) > 0 {
-		where = " where " + where
+	var where string
+	if sb.Len() > 0 {
+		where = " where " + sqlx.Rebind(sqlx.DOLLAR, sb.String())
 	}
 
 	// count
@@ -549,7 +495,7 @@ func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persist
 		return persistence.QueryResult[persistence.IndexRecord, string]{Total: total}, nil
 	}
 	args = append(args, query.Limit+1)
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index_record %s order by index_id asc, id asc limit $%d", where, len(args)), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from index_record %s order by id limit $%d", where, len(args)), args...)
 	if err != nil {
 		return persistence.QueryResult[persistence.IndexRecord, string]{Total: total}, persistence.MapError(err)
 	}
@@ -559,17 +505,20 @@ func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persist
 	if err != nil {
 		return persistence.QueryResult[persistence.IndexRecord, string]{}, persistence.MapError(err)
 	}
-	var nextID persistence.IndexRecordID
+	var nextID string
 	if len(res) > query.Limit {
-		nextID = persistence.IndexRecordID{IndexID: res[len(res)-1].IndexID, RecordID: res[len(res)-1].ID}
+		nextID = res[len(res)-1].ID
 		res = res[:query.Limit]
 	}
-	return persistence.QueryResult[persistence.IndexRecord, string]{Items: res, NextID: nextID.Encode(), Total: total}, nil
+	return persistence.QueryResult[persistence.IndexRecord, string]{Items: res, NextID: nextID, Total: total}, nil
 }
 
-func (m *modelTx) Search(query persistence.SearchQuery) (persistence.QueryResult[persistence.SearchQueryResultItem, string], error) {
+func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQueryResult, error) {
+	if len(query.Query) == 0 {
+		return persistence.SearchQueryResult{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
+	}
 	if m.searchFn != nil {
 		return m.searchFn(m.ctx, m.executor(), query)
 	}
-	return persistence.QueryResult[persistence.SearchQueryResultItem, string]{}, errors.ErrUnimplemented
+	return persistence.SearchQueryResult{}, errors.ErrUnimplemented
 }

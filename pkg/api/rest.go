@@ -10,6 +10,7 @@ import (
 	"github.com/simila-io/simila/api/gen/format/v1"
 	"github.com/simila-io/simila/api/gen/index/v1"
 	similapi "github.com/simila-io/simila/api/genpublic/v1"
+	"github.com/simila-io/simila/pkg/indexer/persistence"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"net/http"
 	"path"
@@ -36,7 +37,134 @@ func (r *Rest) RegisterEPs(g *gin.Engine) error {
 	return nil
 }
 
-func (r *Rest) GetFormats(c *gin.Context) {
+func (r *Rest) ListNodes(c *gin.Context, params similapi.ListNodesParams) {
+	nodes, err := r.svc.IndexServiceServer().ListNodes(c, &index.Path{Path: cast.Value(params.Path, "")})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, similapi.ListNodesResult{Items: nodes2Rest(nodes.Nodes)})
+}
+
+func (r *Rest) UpdateNode(c *gin.Context, path similapi.Path) {
+	var n similapi.Node
+	if r.errorRespnse(c, BindAppJson(c, &n), "") {
+		return
+	}
+	_, err := r.svc.IndexServiceServer().UpdateNode(c,
+		&index.UpdateNodeRequest{Path: persistence.ConcatPath(path, ""), Node: &index.Node{Tags: n.Tags}})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
+func (r *Rest) DeleteNode(c *gin.Context, path similapi.Path) {
+	_, err := r.svc.IndexServiceServer().DeleteNode(c, &index.Path{Path: persistence.ConcatPath(path, "")})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (r *Rest) ListNodeRecords(c *gin.Context, path similapi.Path, params similapi.ListNodeRecordsParams) {
+	lrr := &index.ListRequest{}
+	lrr.Path = persistence.ConcatPath(path, "")
+	if params.Limit != nil {
+		lrr.Limit = cast.Ptr(int64(*params.Limit))
+	}
+	lrr.Format = params.Format
+	if params.CreatedAfter != nil {
+		lrr.CreatedAfter = timestamppb.New(*params.CreatedAfter)
+	}
+	if params.CreatedBefore != nil {
+		lrr.CreatedBefore = timestamppb.New(*params.CreatedBefore)
+	}
+	lrr.PageId = params.PageId
+	lr, err := r.svc.IndexServiceServer().ListRecords(c, lrr)
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, similapi.ListRecordsResult{Records: cast.Ptr(records2Rest(lr.Records)), Total: int(lr.Total), NextPageId: lr.NextPageId})
+}
+
+func (r *Rest) PatchNodeRecords(c *gin.Context, path similapi.Path) {
+	var pr similapi.PatchRecordsRequest
+	if r.errorRespnse(c, BindAppJson(c, &pr), "") {
+		return
+	}
+	prr, err := r.svc.IndexServiceServer().PatchRecords(c, &index.PatchRecordsRequest{
+		Path:          path,
+		DeleteRecords: rest2Records(pr.DeleteRecords),
+		UpsertRecords: rest2Records(pr.UpsertRecords),
+	})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, similapi.PatchRecordsResult{Deleted: int(prr.Deleted), Upserted: int(prr.Upserted)})
+}
+
+func (r *Rest) CreateNodeRecords(c *gin.Context, path similapi.Path) {
+	var crr similapi.CreateRecordsRequest
+	var res *index.CreateRecordsResult
+	if err := BindAppJson(c, &crr); err == nil {
+		r.logger.Infof("creating new node records %v", crr)
+		res, err = r.svc.createRecords(c, rest2CreateRecordsRequest(path, crr), nil)
+		if r.errorRespnse(c, err, "") {
+			return
+		}
+	} else {
+		form, err := c.MultipartForm()
+		if err != nil {
+			r.errorRespnse(c, errors.ErrUnimplemented, "expecting either application/json or multipart/form-data with valid request")
+			return
+		}
+
+		metas := form.Value["meta"]
+		if len(metas) > 0 {
+			meta := metas[0]
+			err = json.Unmarshal(cast.StringToByteArray(meta), &crr)
+			if err != nil {
+				r.errorRespnse(c, errors.ErrInvalid, fmt.Sprintf("could not parse meta value: %s", err.Error()))
+				return
+			}
+		}
+		fh, err := c.FormFile("file")
+		if err != nil {
+			r.errorRespnse(c, errors.ErrInvalid, fmt.Sprintf("for multipar/form-data file field must be provided: %s", err.Error()))
+			return
+		}
+
+		file, err := fh.Open()
+		if r.errorRespnse(c, err, "") {
+			return
+		}
+		defer file.Close()
+
+		res, err = r.svc.createRecords(c, rest2CreateRecordsRequest(path, crr), file)
+		if r.errorRespnse(c, err, "") {
+			return
+		}
+	}
+	var nc []similapi.Node
+	if res.NodesCreated != nil {
+		nc = nodes2Rest(res.NodesCreated.Nodes)
+	}
+	c.JSON(http.StatusCreated, similapi.CreateRecordsResult{RecordsCreated: int(res.RecordsCreated), NodesCreated: nc})
+}
+
+func (r *Rest) Search(c *gin.Context) {
+	var sr similapi.SearchRecordsRequest
+	if r.errorRespnse(c, BindAppJson(c, &sr), "") {
+		return
+	}
+	res, err := r.svc.IndexServiceServer().Search(c, searchRecordsRequest2Proto(sr))
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.JSON(http.StatusOK, searchRecordsResult2Rest(res))
+}
+
+func (r *Rest) ListFormats(c *gin.Context) {
 	fmts, err := r.svc.FormatServiceServer().List(c, nil)
 	if r.errorRespnse(c, err, "") {
 		return
@@ -73,153 +201,9 @@ func (r *Rest) GetFormat(c *gin.Context, formatId similapi.FormatId) {
 	c.JSON(http.StatusOK, format2Rest(f))
 }
 
-func (r *Rest) GetIndexes(c *gin.Context, params similapi.GetIndexesParams) {
-	req := &index.ListRequest{}
-	if params.CreatedAfter != nil {
-		req.CreatedAfter = timestamppb.New(*params.CreatedAfter)
-	}
-	if params.CreatedBefore != nil {
-		req.CreatedBefore = timestamppb.New(*params.CreatedBefore)
-	}
-	if params.Limit != nil {
-		req.Limit = cast.Ptr(int64(*params.Limit))
-	}
-	if params.StartIndexId != nil {
-		req.StartIndexId = *params.StartIndexId
-	}
-	if params.Tags != nil {
-		req.Tags = *params.Tags
-	}
-	if params.Format != nil {
-		req.Format = params.Format
-	}
-	idxs, err := r.svc.IndexServiceServer().List(c, req)
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, idxs)
-}
-
-func (r *Rest) CreateIndex(c *gin.Context) {
-	var cir similapi.CreateIndexRequest
-	var idx *index.Index
-	if err := BindAppJson(c, &cir); err == nil {
-		r.logger.Infof("creating new index from the json object %s", cir)
-		idx, err = r.svc.createIndex(c, createIndexRequest2Proto(cir), nil)
-		if r.errorRespnse(c, err, "") {
-			return
-		}
-	} else {
-		form, err := c.MultipartForm()
-		if err != nil {
-			r.errorRespnse(c, errors.ErrUnimplemented, "expecting either application/json or multipart/form-data with valid request")
-			return
-		}
-
-		metas := form.Value["meta"]
-		if len(metas) > 0 {
-			meta := metas[0]
-			err = json.Unmarshal(cast.StringToByteArray(meta), &cir)
-			if err != nil {
-				r.errorRespnse(c, errors.ErrInvalid, fmt.Sprintf("could not parse meta value: %s", err.Error()))
-				return
-			}
-		}
-		fh, err := c.FormFile("file")
-		if err != nil {
-			r.errorRespnse(c, errors.ErrInvalid, fmt.Sprintf("for multipar/form-data file field must be provided: %s", err.Error()))
-			return
-		}
-
-		file, err := fh.Open()
-		if r.errorRespnse(c, err, "") {
-			return
-		}
-		defer file.Close()
-
-		idx, err = r.svc.createIndex(c, createIndexRequest2Proto(cir), file)
-		if r.errorRespnse(c, err, "") {
-			return
-		}
-	}
-	c.Header("Location", ComposeURI(c.Request, idx.Id))
-	c.JSON(http.StatusCreated, index2Rest(idx))
-
-}
-
-func (r *Rest) DeleteIndex(c *gin.Context, indexId similapi.IndexId) {
-	_, err := r.svc.idxService.Delete(c, &index.Id{Id: indexId})
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-func (r *Rest) GetIndex(c *gin.Context, indexId similapi.IndexId) {
-	idx, err := r.svc.IndexServiceServer().Get(c, &index.Id{Id: indexId})
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, index2Rest(idx))
-}
-
-func (r *Rest) PutIndex(c *gin.Context, indexId similapi.IndexId) {
-	var idx similapi.Index
-	if r.errorRespnse(c, BindAppJson(c, &idx), "") {
-		return
-	}
-	idx.Id = indexId
-	updated, err := r.svc.IndexServiceServer().Put(c, index2Proto(idx))
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, index2Rest(updated))
-}
-
-func (r *Rest) GetIndexRecords(c *gin.Context, indexId similapi.IndexId, params similapi.GetIndexRecordsParams) {
-	var req index.ListRecordsRequest
-	req.Id = indexId
-	if params.PageId != nil {
-		req.StartRecordId = params.PageId
-	}
-	if params.Limit != nil {
-		req.Limit = cast.Ptr(int64(*params.Limit))
-	}
-	res, err := r.svc.IndexServiceServer().ListRecords(c, &req)
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, listRecordsResult2Rest(res))
-}
-
-func (r *Rest) PatchIndexRecords(c *gin.Context, indexId similapi.IndexId) {
-	var req similapi.PatchRecordsRequest
-	if r.errorRespnse(c, BindAppJson(c, &req), "") {
-		return
-	}
-	req.Id = indexId
-	updated, err := r.svc.IndexServiceServer().PatchRecords(c, patchIndexRecordsRequest2Proto(req))
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, patchIndexRecordsResult2Rest(updated))
-}
-
 func (r *Rest) Ping(c *gin.Context) {
 	r.logger.Debugf("ping")
 	c.String(http.StatusOK, "pong")
-}
-
-func (r *Rest) Search(c *gin.Context) {
-	var sr similapi.SearchRequest
-	if r.errorRespnse(c, BindAppJson(c, &sr), "") {
-		return
-	}
-	res, err := r.svc.IndexServiceServer().SearchRecords(c, searchRequest2Proto(sr))
-	if r.errorRespnse(c, err, "") {
-		return
-	}
-	c.JSON(http.StatusOK, searchRecordsResult2Rest(res))
 }
 
 func (r *Rest) errorRespnse(c *gin.Context, err error, msg string) bool {

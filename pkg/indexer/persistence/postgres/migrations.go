@@ -36,36 +36,44 @@ create table if not exists "format"
 
 create index if not exists "idx_format_basis" on "format" using gin ("basis");
 
-create table if not exists "index"
+create table if not exists "node"
 (
-    "id"         varchar(255)             not null,
-    "format"  	 varchar(255)             not null references "format" ("id") on delete restrict,
+    "id"         bigserial                not null,
+    "path"       varchar(1024)            not null,
+    "name"       varchar(255)             not null,
     "tags"       jsonb                    not null default '{}'::jsonb,
+    "flags"      integer                  not null default 0,
     "created_at" timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at" timestamp with time zone not null default (now() at time zone 'utc'),
-    primary key ("id")
+    primary key ("id"),
+	unique("path", "name")
 );
 
-create index if not exists "idx_index_tags" on "index" using gin ("tags");
-create index if not exists "idx_index_created_at" on "index" ("created_at");
+create index if not exists "idx_node_tags" on "node" using gin ("tags");
+create index if not exists "idx_node_flags" on "node" ("flags");
+create index if not exists "idx_node_created_at" on "node" ("created_at");
 
 create table if not exists "index_record"
 (
-    "id"          varchar(64)   not null,
-    "index_id"    varchar(255)  not null references "index" ("id") on delete cascade,
-    "segment"     text         	not null,
-    "vector"   	  jsonb        	not null default '{}'::jsonb,
-    "created_at"  timestamp with time zone not null default (now() at time zone 'utc'),
-    "updated_at"  timestamp with time zone not null default (now() at time zone 'utc'),
-    primary key ("index_id", "id")
+    "id"              varchar(64)   not null,
+    "node_id"         bigint        not null references "node" ("id") on delete cascade,
+    "segment"         text         	not null,
+    "vector"   	      jsonb        	not null default '{}'::jsonb,
+    "format"  	      varchar(255)  not null references "format" ("id") on delete restrict,    
+    "rank_multiplier" numeric       not null default 1.0,
+    "created_at"      timestamp with time zone not null default (now() at time zone 'utc'),
+    "updated_at"      timestamp with time zone not null default (now() at time zone 'utc'),
+    primary key ("node_id", "id")
 );
 
+create index if not exists "idx_index_record_node_id" on "index_record" ("node_id");
+create index if not exists "idx_index_record_format" on "index_record" ("format");
 create index if not exists "idx_index_record_vector" on "index_record" using gin ("vector");
 create index if not exists "idx_index_record_created_at" on "index_record" ("created_at");
 `
 	initSchemaDown = `
 drop table if exists "index_record";
-drop table if exists "index";
+drop table if exists "node";
 drop table if exists "format";
 `
 
