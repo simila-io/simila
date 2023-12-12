@@ -293,6 +293,37 @@ func (m *modelTx) GetNode(fqnp string) (persistence.Node, error) {
 	return node, nil
 }
 
+func (m *modelTx) UpdateNode(node persistence.Node) error {
+	if node.ID == 0 {
+		return fmt.Errorf("node ID must be specified: %w", errors.ErrInvalid)
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("update node set")
+
+	var args []any
+	if len(node.Tags) > 0 {
+		sb.WriteString(" tags = ?")
+		args = append(args, node.Tags.JSON())
+	}
+	if len(args) == 0 {
+		return nil
+	}
+
+	sb.WriteString(", updated_at = ? where id = ?")
+	args = append(args, time.Now(), node.ID)
+
+	res, err := m.executor().ExecContext(m.ctx, sqlx.Rebind(sqlx.DOLLAR, sb.String()), args...)
+	if err != nil {
+		return persistence.MapError(err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errors.ErrNotExist
+	}
+	return nil
+}
+
 func (m *modelTx) DeleteNode(nID int64, force bool) error {
 	if !force {
 		childCount, err := persistence.Count(m.ctx, m.executor(),

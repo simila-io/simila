@@ -12,6 +12,8 @@ service Service {
   rpc Create(CreateRecordsRequest) returns (CreateRecordsResult);
   // CreateWithStreamData allows to create new index records by streaming the records.
   rpc CreateWithStreamData(stream CreateIndexStreamRequest) returns (CreateRecordsResult);
+  // UpdateNode allows to update Node data, e.g. tags.
+  rpc UpdateNode(UpdateNodeRequest) returns (google.protobuf.Empty);
   // DeleteNode allows to delete a Node and all its children identified by the path provided
   rpc DeleteNode(Path) returns (google.protobuf.Empty);
   // ListNodes returns all known children for the Path provided
@@ -154,7 +156,7 @@ message SearchRecordsRequest {
 message SearchRecordsResultItem {
   string path = 1;
   Record record = 2;
-  repeated string MatchedKeywords = 3;
+  repeated string matchedKeywords = 3;
   optional float score = 4;
 }
 
@@ -162,4 +164,12 @@ message SearchRecordsResultItem {
 message SearchRecordsResult {
   repeated SearchRecordsResultItem items = 1;
   int64 total = 2;
+}
+
+// UpdateNodeRequest describes input parameters for the node update operation
+message UpdateNodeRequest {
+  // path is the fqnp path to the node
+  string path = 1;
+  // node is the node data to be updated
+  Node node = 2;
 }

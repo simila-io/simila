@@ -60,6 +60,8 @@ type (
 
 		// GetNode returns the node by its fqnp
 		GetNode(fqnp string) (Node, error)
+		// UpdateNode updates node data
+		UpdateNode(node Node) error
 		// DeleteNode deletes the Node and all records associated with the Node.
 		// force allows to delete folder nodes with children. If the node is folder, and there are children,
 		// but the force flag is false, the function will return ErrConflict error

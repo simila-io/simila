@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	Service_Create_FullMethodName               = "/index.v1.Service/Create"
 	Service_CreateWithStreamData_FullMethodName = "/index.v1.Service/CreateWithStreamData"
+	Service_UpdateNode_FullMethodName           = "/index.v1.Service/UpdateNode"
 	Service_DeleteNode_FullMethodName           = "/index.v1.Service/DeleteNode"
 	Service_ListNodes_FullMethodName            = "/index.v1.Service/ListNodes"
 	Service_PatchRecords_FullMethodName         = "/index.v1.Service/PatchRecords"
@@ -37,6 +38,8 @@ type ServiceClient interface {
 	Create(ctx context.Context, in *CreateRecordsRequest, opts ...grpc.CallOption) (*CreateRecordsResult, error)
 	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(ctx context.Context, opts ...grpc.CallOption) (Service_CreateWithStreamDataClient, error)
+	// UpdateNode allows to update Node data, e.g. tags.
+	UpdateNode(ctx context.Context, in *UpdateNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// DeleteNode allows to delete a Node and all its children identified by the path provided
 	DeleteNode(ctx context.Context, in *Path, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListNodes returns all known children for the Path provided
@@ -101,6 +104,15 @@ func (x *serviceCreateWithStreamDataClient) CloseAndRecv() (*CreateRecordsResult
 	return m, nil
 }
 
+func (c *serviceClient) UpdateNode(ctx context.Context, in *UpdateNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Service_UpdateNode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *serviceClient) DeleteNode(ctx context.Context, in *Path, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, Service_DeleteNode_FullMethodName, in, out, opts...)
@@ -154,6 +166,8 @@ type ServiceServer interface {
 	Create(context.Context, *CreateRecordsRequest) (*CreateRecordsResult, error)
 	// CreateWithStreamData allows to create new index records by streaming the records.
 	CreateWithStreamData(Service_CreateWithStreamDataServer) error
+	// UpdateNode allows to update Node data, e.g. tags.
+	UpdateNode(context.Context, *UpdateNodeRequest) (*emptypb.Empty, error)
 	// DeleteNode allows to delete a Node and all its children identified by the path provided
 	DeleteNode(context.Context, *Path) (*emptypb.Empty, error)
 	// ListNodes returns all known children for the Path provided
@@ -177,6 +191,9 @@ func (UnimplementedServiceServer) Create(context.Context, *CreateRecordsRequest)
 }
 func (UnimplementedServiceServer) CreateWithStreamData(Service_CreateWithStreamDataServer) error {
 	return status.Errorf(codes.Unimplemented, "method CreateWithStreamData not implemented")
+}
+func (UnimplementedServiceServer) UpdateNode(context.Context, *UpdateNodeRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateNode not implemented")
 }
 func (UnimplementedServiceServer) DeleteNode(context.Context, *Path) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNode not implemented")
@@ -248,6 +265,24 @@ func (x *serviceCreateWithStreamDataServer) Recv() (*CreateIndexStreamRequest, e
 		return nil, err
 	}
 	return m, nil
+}
+
+func _Service_UpdateNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServiceServer).UpdateNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Service_UpdateNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServiceServer).UpdateNode(ctx, req.(*UpdateNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Service_DeleteNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -350,6 +385,10 @@ var Service_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Create",
 			Handler:    _Service_Create_Handler,
+		},
+		{
+			MethodName: "UpdateNode",
+			Handler:    _Service_UpdateNode_Handler,
 		},
 		{
 			MethodName: "DeleteNode",

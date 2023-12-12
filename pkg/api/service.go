@@ -157,6 +157,29 @@ func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.No
 	return nodes2Create
 }
 
+func (s *Service) updateNode(ctx context.Context, request *index.UpdateNodeRequest) (*emptypb.Empty, error) {
+	res := &emptypb.Empty{}
+	if request == nil {
+		return res, errors.GRPCWrap(fmt.Errorf("invalid nil request: %w", errors.ErrInvalid))
+	}
+	tags := cast.Value(request.Node, index.Node{}).Tags
+	s.logger.Infof("updateNode(): path=%q, tags=%v", request.Path, tags)
+
+	mtx := s.Db.NewModelTx(ctx)
+	defer func() {
+		_ = mtx.Rollback()
+	}()
+	n, err := mtx.GetNode(request.Path)
+	if err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	if err = mtx.UpdateNode(persistence.Node{ID: n.ID, Tags: tags}); err != nil {
+		return res, errors.GRPCWrap(err)
+	}
+	mtx.Commit()
+	return res, nil
+}
+
 func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) (*emptypb.Empty, error) {
 	s.logger.Infof("deleteNode(): path=%q, force=%t", path.Path, force)
 	mtx := s.Db.NewModelTx(ctx)
@@ -330,6 +353,10 @@ func (s *Service) listFormat(ctx context.Context, _ *emptypb.Empty) (*format.For
 
 func (ids idxService) Create(ctx context.Context, request *index.CreateRecordsRequest) (*index.CreateRecordsResult, error) {
 	return ids.s.createRecords(ctx, request, nil)
+}
+
+func (ids idxService) UpdateNode(ctx context.Context, request *index.UpdateNodeRequest) (*emptypb.Empty, error) {
+	return ids.s.updateNode(ctx, request)
 }
 
 func (ids idxService) DeleteNode(ctx context.Context, path *index.Path) (*emptypb.Empty, error) {

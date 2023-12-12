@@ -45,6 +45,19 @@ func (r *Rest) ListNodes(c *gin.Context, params similapi.ListNodesParams) {
 	c.JSON(http.StatusOK, similapi.ListNodesResult{Items: nodes2Rest(nodes.Nodes)})
 }
 
+func (r *Rest) UpdateNode(c *gin.Context, path similapi.Path) {
+	var n similapi.Node
+	if r.errorRespnse(c, BindAppJson(c, &n), "") {
+		return
+	}
+	_, err := r.svc.IndexServiceServer().UpdateNode(c,
+		&index.UpdateNodeRequest{Path: persistence.ConcatPath(path, ""), Node: &index.Node{Tags: n.Tags}})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
 func (r *Rest) DeleteNode(c *gin.Context, path similapi.Path) {
 	_, err := r.svc.IndexServiceServer().DeleteNode(c, &index.Path{Path: persistence.ConcatPath(path, "")})
 	if r.errorRespnse(c, err, "") {

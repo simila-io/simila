@@ -45,15 +45,7 @@ func ConcatPath(p1, p2 string) string {
 
 // ToNodePath returns the path in a form as expected by Node
 func ToNodePath(path string) string {
-	parts := SplitPath(path)
-	if len(parts) == 0 {
-		return "/"
-	}
-	path = Path(parts)
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-	}
-	return path
+	return ConcatPath(path, "")
 }
 
 // ToNodePathName returns the path and name parts of the given path as expected by Node
