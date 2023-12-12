@@ -18,6 +18,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -123,4 +124,19 @@ func (t *Tags) Scan(value any) error {
 		return fmt.Errorf("not a []byte value in scan")
 	}
 	return json.Unmarshal(buf, &t)
+}
+
+func (t Tags) JSON() string {
+	var sb strings.Builder
+	sb.WriteString("{")
+	if len(t) > 0 {
+		for k, v := range t {
+			if sb.Len() > 1 {
+				sb.WriteByte(',')
+			}
+			sb.WriteString(fmt.Sprintf("%q:%q", k, v))
+		}
+	}
+	sb.WriteString("}")
+	return sb.String()
 }

@@ -220,10 +220,6 @@ func (s *Service) listRecords(ctx context.Context, request *index.ListRequest) (
 
 func (s *Service) search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
 	mtx := s.Db.NewModelTx(ctx)
-	mtx.MustBegin()
-	defer func() {
-		_ = mtx.Rollback()
-	}()
 	res := &index.SearchRecordsResult{}
 	q := persistence.SearchQuery{
 		Path:   request.Path,
@@ -242,7 +238,6 @@ func (s *Service) search(ctx context.Context, request *index.SearchRecordsReques
 	}
 	res.Total = qr.Total
 	res.Items = toApiSearchRecords(qr.Items)
-	_ = mtx.Commit()
 	return res, nil
 }
 

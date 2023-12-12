@@ -36,8 +36,7 @@ type (
 	}
 
 	// SearchFn is used to provide different search implementations
-	SearchFn func(ctx context.Context, qx sqlx.QueryerContext,
-		n persistence.Node, q persistence.SearchQuery) (persistence.SearchQueryResult, error)
+	SearchFn func(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error)
 
 	// exec is a helper interface to provide joined functionality of sqlx.DB and sqlx.Tx
 	// it is used by the tx.executor()
@@ -254,21 +253,21 @@ func (m *modelTx) CreateNodes(nodes ...persistence.Node) ([]persistence.Node, er
 
 func (m *modelTx) ListNodes(path string) ([]persistence.Node, error) {
 	var sb strings.Builder
-	var params []any
+	var args []any
 
 	for _, p := range persistence.ToNodePathNamePairs(path) {
 		if sb.Len() > 0 {
 			sb.WriteString(" or ")
 		}
 		sb.WriteString("(path = ? and name = ?)")
-		params = append(params, p[0], p[1])
+		args = append(args, p[0], p[1])
 	}
 	if sb.Len() == 0 {
 		return nil, nil
 	}
 
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name", where), params...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name", where), args...)
 	if err != nil {
 		return nil, persistence.MapError(err)
 	}
@@ -305,8 +304,8 @@ func (m *modelTx) DeleteNode(nID int64, force bool) error {
 			return persistence.MapError(err)
 		}
 		if childCount > 0 {
-			return fmt.Errorf("delete node with ID=%d failed, "+
-				"force=%t and the node has children: %w", nID, force, errors.ErrConflict)
+			return fmt.Errorf("delete node with ID=%d failed (force=%t), "+
+				"the node has children: %w", nID, force, errors.ErrConflict)
 		}
 	}
 	res, err := m.executor().ExecContext(m.ctx,
@@ -384,21 +383,21 @@ func (m *modelTx) DeleteIndexRecords(records ...persistence.IndexRecord) (int64,
 	}
 
 	var sb strings.Builder
-	var params []any
+	var args []any
 
 	for _, r := range records {
 		if sb.Len() > 0 {
 			sb.WriteString(" or ")
 		}
 		sb.WriteString("(node_id = ? and id = ?)")
-		params = append(params, r.NodeID, r.ID)
+		args = append(args, r.NodeID, r.ID)
 	}
 	if sb.Len() == 0 {
 		return 0, nil
 	}
 
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	res, err := m.executor().ExecContext(m.ctx, fmt.Sprintf("delete from index_record where %s", where), params...)
+	res, err := m.executor().ExecContext(m.ctx, fmt.Sprintf("delete from index_record where %s", where), args...)
 	if err != nil {
 		return 0, persistence.MapError(err)
 	}
@@ -487,15 +486,8 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQuery
 	if len(query.Query) == 0 {
 		return persistence.SearchQueryResult{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
-	if len(query.Path) == 0 {
-		query.Path = "/"
-	}
-	node, err := m.GetNode(query.Path)
-	if err != nil {
-		return persistence.SearchQueryResult{}, fmt.Errorf("search failed to get node by path=%s: %w", query.Path, err)
-	}
 	if m.searchFn != nil {
-		return m.searchFn(m.ctx, m.executor(), node, query)
+		return m.searchFn(m.ctx, m.executor(), query)
 	}
 	return persistence.SearchQueryResult{}, errors.ErrUnimplemented
 }
