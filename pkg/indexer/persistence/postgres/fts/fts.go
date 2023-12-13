@@ -85,7 +85,7 @@ func Migrations(rollback bool) []*migrate.Migration {
 // function based on the postgres built-in full-text search.
 // Queries must be formed in accordance with the `websearch_to_tsquery()` query syntax,
 // see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
-func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
+func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var params []any
 	var sb strings.Builder
 
@@ -98,15 +98,12 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	qrPrm := len(params)
 	kwFmt := "MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>"
 
-	if q.Strict { // search records of a node with path+name == q.Path
-		path, name := persistence.ToNodePathName(q.Path)
-		sb.WriteString(fmt.Sprintf(" and node_id = (select id from node "+
-			"where path = $%d and name = $%d and tags @> $%d) ", len(params)+1, len(params)+2, len(params)+3))
-		params = append(params, path, name, q.Tags.JSON())
+	if q.Strict {
+		sb.WriteString(fmt.Sprintf(" and node_id = $%d ", len(params)+1))
+		params = append(params, r.ID)
 
 		where := sb.String()
-		count = fmt.Sprintf("select count(*) from index_record "+
-			"inner join node as n on n.id = node_id where %s", where)
+		count = fmt.Sprintf("select count(*) from index_record where %s", where)
 
 		query = fmt.Sprintf("select index_record.*, "+
 			"concat(n.path, n.name) as path, "+
@@ -118,14 +115,18 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			"order by score desc, id "+
 			"offset $%d limit $%d", qrPrm, qrPrm, kwFmt, where, len(params)+1, len(params)+2)
 
-	} else { // search records of nodes whose path starts with q.Path
-		sb.WriteString(fmt.Sprintf(" and node_id in (select id from node "+
-			"where path like concat($%d::text, '%%') and tags @> $%d) ", len(params)+1, len(params)+2))
-		params = append(params, persistence.ToNodePath(q.Path), q.Tags.JSON())
+	} else {
+		if r.Flags == persistence.NodeFlagDocument {
+			sb.WriteString(fmt.Sprintf(" and node_id = $%d ", len(params)+1))
+			params = append(params, r.ID)
+		} else {
+			sb.WriteString(fmt.Sprintf(" and node_id in (select id from node "+
+				"where path like concat($%d::text, '%%') and tags @> $%d) ", len(params)+1, len(params)+2))
+			params = append(params, persistence.ToNodePath(q.Path), q.Tags.JSON())
+		}
 
 		where := sb.String()
-		count = fmt.Sprintf("select count(distinct node_id) from index_record "+
-			"inner join node as n on n.id = node_id where %s", where)
+		count = fmt.Sprintf("select count(distinct node_id) from index_record where %s", where)
 
 		query = fmt.Sprintf("select distinct on(score, path) index_record.*, "+
 			"concat(n.path, n.name) as path, "+

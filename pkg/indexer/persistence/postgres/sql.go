@@ -36,7 +36,7 @@ type (
 	}
 
 	// SearchFn is used to provide different search implementations
-	SearchFn func(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error)
+	SearchFn func(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q persistence.SearchQuery) (persistence.SearchQueryResult, error)
 
 	// exec is a helper interface to provide joined functionality of sqlx.DB and sqlx.Tx
 	// it is used by the tx.executor()
@@ -517,8 +517,14 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQuery
 	if len(query.Query) == 0 {
 		return persistence.SearchQueryResult{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
+	path, name := persistence.ToNodePathName(query.Path)
+	var root persistence.Node
+	if err := m.executor().GetContext(m.ctx, &root, "select * from node where path = $1 and name = $2 and tags @> $3",
+		path, name, query.Tags.JSON()); err != nil {
+		return persistence.SearchQueryResult{}, persistence.MapError(err)
+	}
 	if m.searchFn != nil {
-		return m.searchFn(m.ctx, m.executor(), query)
+		return m.searchFn(m.ctx, m.executor(), root, query)
 	}
 	return persistence.SearchQueryResult{}, errors.ErrUnimplemented
 }

@@ -272,7 +272,7 @@ components:
           description: The node name, must be unique among the siblings in the tree.
         path:
           type: string
-          description: The node path (identifier) within the index.
+          description: The node path, does not include the name part.
         type:
           $ref: '#/components/schemas/NodeType'
         tags:
@@ -438,10 +438,10 @@ components:
           $ref: '#/components/schemas/Tags'
         path:
           type: string
-          description: The node path where the text to be searched for, by default, this includes the node subtrees too.
+          description: The node path where the text to be searched for, including the subtrees in case of a folder.
         strict:
           type: boolean
-          description: The strict flag limits the search scope strictly to the node located by the provided path, i.e. the node subtrees are not included.
+          description: The strict flag limits the search scope strictly to the node located by the provided path (i.e. subtrees are not included in case of a folder).
         offset:
           type: integer
           description: The number of records to skip before start returning results.
