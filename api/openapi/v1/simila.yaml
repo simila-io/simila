@@ -425,6 +425,7 @@ components:
       description: The object is used to search text across all the index records.
       required:
         - text
+        - format
         - tags
         - path
         - strict
@@ -434,6 +435,9 @@ components:
         text:
           type: string
           description: The text to be found in the records.
+        format:
+          type: string
+          description: The format of the records to search for.
         tags:
           $ref: '#/components/schemas/Tags'
         path:

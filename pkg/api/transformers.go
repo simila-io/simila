@@ -139,6 +139,7 @@ func formats2Rest(fs *format.Formats) similapi.Formats {
 func searchRecordsRequest2Proto(sr similapi.SearchRecordsRequest) *index.SearchRecordsRequest {
 	return &index.SearchRecordsRequest{
 		Text:   sr.Text,
+		Format: sr.Format,
 		Tags:   sr.Tags,
 		Strict: cast.Ptr(sr.Strict),
 		Path:   sr.Path,

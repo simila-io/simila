@@ -285,14 +285,9 @@ func (m *modelTx) ListChildren(path string) ([]persistence.Node, error) {
 }
 
 func (m *modelTx) GetNode(fqnp string) (persistence.Node, error) {
-	return m.getNodeWithTags(fqnp, nil)
-}
-
-func (m *modelTx) getNodeWithTags(fqnp string, tags persistence.Tags) (persistence.Node, error) {
 	path, name := persistence.ToNodePathName(fqnp)
 	var node persistence.Node
-	if err := m.executor().GetContext(m.ctx, &node, "select * from node where path = $1 and name = $2 and tags @> $3",
-		path, name, tags.JSON()); err != nil {
+	if err := m.executor().GetContext(m.ctx, &node, "select * from node where path=$1 and name = $2", path, name); err != nil {
 		return persistence.Node{}, persistence.MapError(err)
 	}
 	return node, nil
@@ -522,7 +517,7 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQuery
 	if len(query.Query) == 0 {
 		return persistence.SearchQueryResult{}, fmt.Errorf("search query must be non-empty: %w", errors.ErrInvalid)
 	}
-	root, err := m.getNodeWithTags(query.Path, query.Tags)
+	root, err := m.GetNode(query.Path)
 	if err != nil {
 		if errors.Is(err, errors.ErrNotExist) {
 			return persistence.SearchQueryResult{}, nil

@@ -92,6 +92,11 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 	sb.WriteString(fmt.Sprintf(" segment_tsvector @@ websearch_to_tsquery('simila', $%d) ", len(params)+1))
 	params = append(params, q.Query)
 
+	if len(q.Format) > 0 {
+		sb.WriteString(fmt.Sprintf(" and format = $%d ", len(params)+1))
+		params = append(params, q.Format)
+	}
+
 	var count string
 	var query string
 
@@ -99,11 +104,13 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 	kwFmt := "MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>"
 
 	if q.Strict {
-		sb.WriteString(fmt.Sprintf(" and node_id = $%d ", len(params)+1))
-		params = append(params, r.ID)
+		sb.WriteString(fmt.Sprintf(" and node_id = $%d and n.tags @> $%d ", len(params)+1, len(params)+2))
+		params = append(params, r.ID, q.Tags.JSON())
 
 		where := sb.String()
-		count = fmt.Sprintf("select count(*) from index_record where %s", where)
+		count = fmt.Sprintf("select count(*) from index_record "+
+			"inner join node as n on n.id = node_id "+
+			"where %s", where)
 
 		query = fmt.Sprintf("select index_record.*, "+
 			"concat(n.path, n.name) as path, "+
@@ -117,8 +124,8 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 
 	} else {
 		if r.Flags == persistence.NodeFlagDocument {
-			sb.WriteString(fmt.Sprintf(" and node_id = $%d ", len(params)+1))
-			params = append(params, r.ID)
+			sb.WriteString(fmt.Sprintf(" and node_id = $%d and n.tags @> $%d ", len(params)+1, len(params)+2))
+			params = append(params, r.ID, q.Tags.JSON())
 		} else {
 			sb.WriteString(fmt.Sprintf(" and node_id in (select id from node "+
 				"where path like concat($%d::text, '%%') and tags @> $%d) ", len(params)+1, len(params)+2))
@@ -126,7 +133,9 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 		}
 
 		where := sb.String()
-		count = fmt.Sprintf("select count(distinct node_id) from index_record where %s", where)
+		count = fmt.Sprintf("select count(distinct node_id) from index_record "+
+			"inner join node as n on n.id = node_id "+
+			"where %s", where)
 
 		query = fmt.Sprintf("select distinct on(score, path) index_record.*, "+
 			"concat(n.path, n.name) as path, "+
