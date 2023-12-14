@@ -54,7 +54,7 @@ curl -i -XGET "http://localhost:8080/v1/nodes?path=/orgs/5678"
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
 
 # Search organization node children with filter via tags, return most relevant record per node only
-curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {"shared":"true"}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
+curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {"public":"true"}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
 
 # Search "Coca-Cola Company" all node children, return most relevant record per node only
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234", "tags": {}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
