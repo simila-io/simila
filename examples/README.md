@@ -11,7 +11,7 @@ curl -i -XPOST -H "content-type: application/json" -d '{"name": "spreadsheetsMet
 curl -i -XPOST -H "content-type: application/json" -d '{"name": "spreadsheetsData", "basis": ["sheet", "row", "col"]}' "http://localhost:8080/v1/formats"
 ```
 
-### Create needed formats
+### List created formats
 
 ```bash
 # List created formats
