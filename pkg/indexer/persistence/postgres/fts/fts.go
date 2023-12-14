@@ -100,7 +100,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 	var count string
 	var query string
 
-	qrPrm := len(params)
+	qrPrm := 1
 	kwFmt := "MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>"
 
 	if q.Strict {
@@ -115,7 +115,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 		query = fmt.Sprintf("select index_record.*, "+
 			"concat(n.path, n.name) as path, "+
 			"(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score, "+
-			"ts_headline(segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
+			"ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
 			"from index_record "+
 			"inner join node as n on n.id = node_id "+
 			"where %s "+
@@ -140,7 +140,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 		query = fmt.Sprintf("select distinct on(score, path) index_record.*, "+
 			"concat(n.path, n.name) as path, "+
 			"r.score as score, "+
-			"ts_headline(segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
+			"ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
 			"from ("+
 			//
 			"select node_id, "+
@@ -168,6 +168,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 		return persistence.SearchQueryResult{Total: total}, nil
 	}
 	params = append(params, q.Offset, q.Limit)
+
 	rows, err := qx.QueryxContext(ctx, query, params...)
 	if err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)

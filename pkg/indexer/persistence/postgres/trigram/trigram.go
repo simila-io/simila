@@ -83,7 +83,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 	var count string
 	var query string
 
-	qrPrm := len(params)
+	qrPrm := 1
 	if q.Strict {
 		sb.WriteString(fmt.Sprintf(" and node_id = $%d and n.tags @> $%d ", len(params)+1, len(params)+2))
 		params = append(params, r.ID, q.Tags.JSON())
