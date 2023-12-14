@@ -144,5 +144,5 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
 Search the organization node children, only the `Ford Motors Company` records are expected:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
