@@ -177,7 +177,7 @@ func (r *Rest) CreateFormat(c *gin.Context) {
 	if r.errorRespnse(c, BindAppJson(c, &f), "") {
 		return
 	}
-	f1, err := r.svc.FormatServiceServer().Create(c, &format.Format{Name: f.Name})
+	f1, err := r.svc.FormatServiceServer().Create(c, &format.Format{Name: f.Name, Basis: f.Basis})
 	if r.errorRespnse(c, err, "") {
 		return
 	}

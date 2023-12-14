@@ -243,10 +243,15 @@ components:
       description: The object describes a data format.
       required:
         - name
+        - basis
       properties:
         name:
           type: string
           description: The format name, it is used as the format identifier.
+        basis:
+          type: string
+          description: The format basis specifies format dimensions.
+          format: byte
     Formats:
       type: object
       description: The object is used as a response of the formats list request.

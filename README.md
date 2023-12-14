@@ -35,7 +35,7 @@ grpcurl --plaintext localhost:50051 grpc.health.v1.Health/Check # grpc API
 The [configuration settings](docs/configuration.md) could be passed to Simila via configuration file `simila start --config simila.yaml` or via the environment variables starting with the `SIMILA_` prefix.
 
 ## How to run
-Here are some examples, how Simila can be run:
+Here are some examples of how to run Simila:
 
 - [Runing localy in docker compose](docs/deployment.md#docker-compose-locally)
 - [Build and run locally from the source code](docs/deployment.md#compile-from-the-source-code-and-run-it-locally)
