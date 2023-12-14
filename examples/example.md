@@ -5,10 +5,10 @@ This section describes an example of how to work with Simila API and objects. Th
 The example illustrates:
 
 - how to make different types of data searchable;
-- how to add, update and delete searchable data;
-- how to perform search a search across one or many nodes;
+- how to add, update, and delete searchable data;
+- how to perform a search across one or many nodes;
 - how to filter (via tags) the scope of searchable data;
-- how to work in general with Simila objects like `format`, `node`, `tags` and `record`.
+- how to generally work with Simila objects like `format`, `node`, `tags` and `record`.
 
 If some concepts are not clear, please refer to [core concepts](../docs/concepts.md).   
 If some API is not described in this section, please refer to [simila.yaml](../api/openapi/v1/simila.yaml).
