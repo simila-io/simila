@@ -1,4 +1,4 @@
-### Create needed formats
+### 1. Create formats for records
 
 ```bash
 # Create format for organization meta (e.g. name)
@@ -11,14 +11,14 @@ curl -i -XPOST -H "content-type: application/json" -d '{"name": "spreadsheetsMet
 curl -i -XPOST -H "content-type: application/json" -d '{"name": "spreadsheetsData", "basis": ["sheet", "row", "col"]}' "http://localhost:8080/v1/formats"
 ```
 
-### List created formats
+### 2. List the created formats
 
 ```bash
 # List created formats
 curl -i -XGET "http://localhost:8080/v1/formats"
 ```
 
-### Create searchable records (and corresponding nodes)
+### 3. Create searchable records (and corresponding nodes)
 
 ```bash
 # Make "Coca-Cola Company" organization name searchable for everyone (via tags)
@@ -34,7 +34,7 @@ curl -i -XPOST -H "content-type: application/json" -d "{\"nodeType\": \"folder\"
 curl -i -XPOST -H "content-type: application/json" -d "{\"nodeType\": \"document\", \"tags\": {\"public\": \"true\"}, \"records\": [{\"id\":\"/spreadsheets/2023|balance.xlsx|name\", \"format\": \"spreadsheetsMeta\", \"segment\": \"company balance 2023\", \"rankMultiplier\": 1.5, \"vector\": \"`echo '["/spreadsheets/2023", "balance.xlsx"]' | base64`\"}, {\"id\":\"debit|R1|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"outgoing company transfer \$300\", \"rankMultiplier\": 1.0, \"vector\": \"`echo '["debit", "R1", "C1"]' | base64`\"}, {\"id\":\"debit|R2|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"outgoing company transfer \$600\", \"rankMultiplier\": 1.0, \"vector\": \"`echo '["debit", "R2", "C1"]' | base64`\"}, {\"id\":\"credit|R1|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"incoming company transfer \$3000\", \"rankMultiplier\": 1.0, \"vector\": \"`echo '["credit", "R1", "C1"]' | base64`\"}, {\"id\":\"credit|R2|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"incoming company transfer \$6000\", \"rankMultiplier\": 1.0, \"vector\": \"`echo '["credit", "R2", "C1"]' | base64`\"}]}" "http://localhost:8080/v1/nodes/%2Forgs%2F5678%2Fbalance.xlsx/records"
 ```
 
-### List created nodes
+### 4. List the created nodes
 
 ```bash
 # List organization node children
@@ -47,7 +47,7 @@ curl -i -XGET "http://localhost:8080/v1/nodes?path=/orgs/1234"
 curl -i -XGET "http://localhost:8080/v1/nodes?path=/orgs/5678"
 ```
 
-### Search created records
+### 5. Search created records by specifying different paths, tags etc.
 
 ```bash
 # Search organization node children, return most relevant record per node only
@@ -63,14 +63,21 @@ curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path
 curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
 ```
 
-### Add, update or delete searchable records
+### 6. Add, update and delete searchable records of a node
 
 ```bash
-# Modify "Coca-Cola Company" balance node ("debit" sheet), update text in {R1,C1}, add text to {R3,C1}, remove {R2,C1}
+# Modify "Coca-Cola Company" balance node, "debit" sheet, update text in {R1,C1}, add text to {R3,C1} and remove {R2,C1}
 curl -i -XPATCH -H "content-type: application/json" -d "{ \"upsertRecords\": [{\"id\": \"debit|R1|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"updated outgoing company transfer \$2000000\", \"vector\": \"`echo '["debit", "R1", "C1"]' | base64`\"}, {\"id\": \"debit|R3|C1\", \"format\": \"spreadsheetsData\", \"segment\": \"added outgoing company transfer \$3000000\", \"vector\": \"`echo '["debit", "R3", "C1"]' | base64`\"}], \"deleteRecords\": [{\"id\": \"debit|R2|C1\"}]}" "http://localhost:8080/v1/nodes/%2Forgs%2F1234%2Fbalance.xlsx/records"
 ```
 
-### Delete nodes
+### 7. Search the records of the modified node
+
+```bash
+# Search "Coca-Cola Company" balance node only, the records must have changed
+curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
+```
+
+### 8. Delete nodes
 
 ```bash
 # Delete "Coca-Cola Company" balance node
@@ -78,4 +85,21 @@ curl -i -XDELETE "http://localhost:8080/v1/nodes/%2Forgs%2F1234%2Fbalance.xlsx"
 
 # Delete "Coca-Cola Company" node and all its nodes and records
 curl -i -XDELETE "http://localhost:8080/v1/nodes/%2Forgs%2F1234"
+```
+
+### 9. List the nodes after deletion
+
+```bash
+# List organization node children, only "Ford Motors Company" nodes are expected
+curl -i -XGET "http://localhost:8080/v1/nodes?path=/orgs"
+
+# List "Coca-Cola Company" node children, "not found" is expected
+curl -i -XGET "http://localhost:8080/v1/nodes?path=/orgs/1234"
+```
+
+### 10. Search the records of the deleted node
+
+```bash
+# Search "Coca-Cola Company" balance node, 0 records must be returned
+curl -i -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search"
 ```
