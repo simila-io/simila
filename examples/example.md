@@ -5,10 +5,10 @@ This section describes an example of how to work with Simila API and objects. Th
 The example illustrates:
 
 - how to make different types of data searchable;
-- how to add, update, and delete searchable data;
+- how to add, update and delete searchable data;
 - how to perform a search across one or many nodes;
-- how to filter (via tags) the scope of searchable data;
-- how to generally work with Simila objects like `format`, `node`, `tags` and `record`.
+- how to limit the scope of searchable data with `tags` and `formats` filters;
+- how to delete big chunks of searchable data;
 
 If some concepts are not clear, please refer to [core concepts](../docs/concepts.md).   
 If some API is not described in this section, please refer to [simila.yaml](../api/openapi/v1/simila.yaml).
@@ -99,6 +99,12 @@ Search the organization node children with filter via tags (the `public` tag), r
 
 ```bash
 curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {"public":"true"}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+```
+
+Search the organization node children with filter via format (record type), return the most relevant record per node only:
+
+```bash
+curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "format": "organizationsMeta", "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 Search the `Coca-Cola Company` balance node only, return all the matched records for the node:
