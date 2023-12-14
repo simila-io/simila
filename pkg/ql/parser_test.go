@@ -1,8 +1,11 @@
 package ql
 
 import (
+	"fmt"
+	"github.com/acquirecloud/golibs/errors"
 	"github.com/alecthomas/participle/v2"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -74,4 +77,99 @@ func TestExpressions(t *testing.T) {
 func testOk(t *testing.T, e string) {
 	_, err := parser.ParseString("", e)
 	assert.Nil(t, err)
+}
+
+func TestCondition2Sql(t *testing.T) {
+	dialects := map[string]Dialect{
+		StringParamID: {Flags: PfRValue | PfComparable}, // strings are rvalues only
+		NumberParamID: {Flags: PfRValue | PfComparable}, // numbers are rvalues only
+		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
+		"unary":       {Flags: PfLValue | PfNop},
+		"binary":      {Flags: PfLValue | PfComparable},
+		"inonly":      {Flags: PfLValue | PfInArray},
+	}
+	tr := NewTranslator(dialects)
+	p := participle.MustBuild[Condition](
+		participle.Lexer(sqlLexer),
+		participle.Unquote("String"),
+		participle.CaseInsensitive("Keyword"),
+	)
+	c, err := p.ParseString("", "ptr = 123")
+	assert.Nil(t, err)
+	var sb strings.Builder
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "123 = \"abc\"")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "unary() = \"abc\"")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "binary()")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "binary() > unary")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "inonly() > 123")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "unary()")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "binary() < 1234")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "inonly() in [1234, 3245]")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Condition2Sql(&sb, c))
+}
+
+func TestDialects(t *testing.T) {
+	dialects := map[string]Dialect{
+		StringParamID: {Flags: PfRValue | PfComparable, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+			sb.WriteString("'")
+			sb.WriteString(p.Const.String)
+			sb.WriteString("'")
+			return nil
+		}},
+		NumberParamID: {Flags: PfRValue | PfComparable}, // numbers are rvalues only
+		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
+		"unary": {Flags: PfLValue | PfNop, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+			if p.Function == nil {
+				return fmt.Errorf("unary is a function, not an identifier: %w", errors.ErrInvalid)
+			}
+			if len(p.Function.Params) != 1 {
+				return fmt.Errorf("unary expects only one argument: %w", errors.ErrInvalid)
+			}
+			sb.WriteString("unary123(")
+			if err := tr.Params2Sql(sb, p.Function.Params); err != nil {
+				return err
+			}
+			sb.WriteString(")")
+			return nil
+		}},
+		"binary": {Flags: PfLValue | PfComparable, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+			sb.WriteString("table.param1")
+			return nil
+		}},
+		"inonly": {Flags: PfLValue | PfInArray, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+			sb.WriteString("table.param2")
+			return nil
+		}},
+	}
+
+	tr := NewTranslator(dialects)
+	var sb strings.Builder
+	e, err := parser.ParseString("", "unary(\"hello world\") and (binary != 234 or inonly in [1,2])")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Expression2Sql(&sb, e))
+	assert.Equal(t, "unary123('hello world') AND (table.param1 != 234.000000 OR table.param2 IN [1.000000, 2.000000])", sb.String())
 }
