@@ -25,14 +25,14 @@ import (
 )
 
 func toApiFormat(mFmt persistence.Format) *format.Format {
-	return &format.Format{Name: mFmt.ID}
+	return &format.Format{Name: mFmt.ID, Basis: mFmt.Basis}
 }
 
 func toModelFormat(aFmt *format.Format) persistence.Format {
 	if aFmt == nil {
 		return persistence.Format{}
 	}
-	return persistence.Format{ID: aFmt.Name}
+	return persistence.Format{ID: aFmt.Name, Basis: aFmt.Basis}
 }
 
 func toModelIndexRecordFromApiRecord(nID int64, aRec *index.Record, defRankMul float64) persistence.IndexRecord {
@@ -121,7 +121,7 @@ func toApiSearchRecords(srs []persistence.SearchQueryResultItem) []*index.Search
 }
 
 func format2Rest(f *format.Format) similapi.Format {
-	return similapi.Format{Name: f.Name}
+	return similapi.Format{Name: f.Name, Basis: f.Basis}
 }
 
 func formats2Rest(fs *format.Formats) similapi.Formats {
@@ -139,6 +139,7 @@ func formats2Rest(fs *format.Formats) similapi.Formats {
 func searchRecordsRequest2Proto(sr similapi.SearchRecordsRequest) *index.SearchRecordsRequest {
 	return &index.SearchRecordsRequest{
 		Text:   sr.Text,
+		Format: sr.Format,
 		Tags:   sr.Tags,
 		Strict: cast.Ptr(sr.Strict),
 		Path:   sr.Path,

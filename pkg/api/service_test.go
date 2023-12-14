@@ -8,10 +8,11 @@ import (
 )
 
 func TestNodes2Create(t *testing.T) {
-	assert.Equal(t, []persistence.Node{{Path: "/", Name: "aaa"}, {Path: "/aaa", Name: "bbb"}},
-		nodes2Create([]string{"aaa", "bbb"}, nil, index.NodeType_FOLDER))
-	assert.Equal(t, []persistence.Node{{Path: "/aaa", Name: "bbb"}},
-		nodes2Create([]string{"aaa", "bbb"}, []persistence.Node{{Path: "/", Name: "aaa"}}, index.NodeType_FOLDER))
+	tags := map[string]string{"key": "val"}
+	assert.Equal(t, []persistence.Node{{Path: "/", Name: "aaa"}, {Path: "/aaa", Name: "bbb", Tags: tags}},
+		nodes2Create([]string{"aaa", "bbb"}, nil, tags, index.NodeType_FOLDER))
+	assert.Equal(t, []persistence.Node{{Path: "/aaa", Name: "bbb", Tags: tags}},
+		nodes2Create([]string{"aaa", "bbb"}, []persistence.Node{{Path: "/", Name: "aaa"}}, tags, index.NodeType_FOLDER))
 	assert.Equal(t, []persistence.Node{},
-		nodes2Create([]string{"aaa", "bbb"}, []persistence.Node{{Path: "/", Name: "aaa"}, {Path: "/aaa", Name: "bbb"}}, index.NodeType_FOLDER))
+		nodes2Create([]string{"aaa", "bbb"}, []persistence.Node{{Path: "/", Name: "aaa"}, {Path: "/aaa", Name: "bbb"}}, nil, index.NodeType_FOLDER))
 }

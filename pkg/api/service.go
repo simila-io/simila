@@ -110,7 +110,7 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 	if err != nil {
 		return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
 	}
-	n2c := nodes2Create(pths, nodes, cast.Value(request.NodeType, index.NodeType_FOLDER))
+	n2c := nodes2Create(pths, nodes, request.Tags, cast.Value(request.NodeType, index.NodeType_FOLDER))
 	if len(n2c) > 0 {
 		nodes, err = mtx.CreateNodes(n2c...)
 		if err != nil {
@@ -132,13 +132,13 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 		if err != nil {
 			return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
 		}
-		res.RecordsCreated = int64(rc)
+		res.RecordsCreated = rc
 	}
 	_ = mtx.Commit()
 	return res, nil
 }
 
-func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.NodeType) []persistence.Node {
+func nodes2Create(pths []string, nodes []persistence.Node, tags persistence.Tags, lastNodeType index.NodeType) []persistence.Node {
 	nodes2Create := []persistence.Node{}
 	if len(nodes) < len(pths) {
 		p := "/"
@@ -150,6 +150,7 @@ func nodes2Create(pths []string, nodes []persistence.Node, lastNodeType index.No
 			nodes2Create = append(nodes2Create, persistence.Node{Path: p, Name: pths[i]})
 			p = persistence.ConcatPath(p, pths[i])
 		}
+		nodes2Create[len(nodes2Create)-1].Tags = tags
 		if lastNodeType == index.NodeType_DOCUMENT {
 			nodes2Create[len(nodes2Create)-1].Flags = persistence.NodeFlagDocument
 		}
@@ -243,9 +244,14 @@ func (s *Service) listRecords(ctx context.Context, request *index.ListRequest) (
 
 func (s *Service) search(ctx context.Context, request *index.SearchRecordsRequest) (*index.SearchRecordsResult, error) {
 	mtx := s.Db.NewModelTx(ctx)
+	mtx.MustBegin()
+	defer func() {
+		_ = mtx.Rollback()
+	}()
 	res := &index.SearchRecordsResult{}
 	q := persistence.SearchQuery{
 		Path:   request.Path,
+		Format: request.Format,
 		Query:  request.Text,
 		Tags:   request.Tags,
 		Strict: cast.Value(request.Strict, false),
@@ -261,6 +267,7 @@ func (s *Service) search(ctx context.Context, request *index.SearchRecordsReques
 	}
 	res.Total = qr.Total
 	res.Items = toApiSearchRecords(qr.Items)
+	_ = mtx.Commit()
 	return res, nil
 }
 

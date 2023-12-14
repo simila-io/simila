@@ -26,6 +26,8 @@ message Id {
 message Format {
   // name uniquely identifies a format
   string name = 1;
+  // basis specifies format dimensions
+  bytes basis = 2;
 }
 
 // Formats uses as a result of List() function

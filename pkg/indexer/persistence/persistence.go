@@ -80,6 +80,9 @@ type (
 		// Search performs search across existing index records
 		// the query string should be formed in accordance with the query
 		// language of the underlying search engine
+		//
+		// NOTE: The operation is not atomic until an external transaction is not started,
+		// the caller MUST start the transaction before using this method.
 		Search(query SearchQuery) (SearchQueryResult, error)
 	}
 
