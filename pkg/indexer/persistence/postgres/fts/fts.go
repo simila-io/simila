@@ -113,7 +113,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 		count = fmt.Sprintf(`select count(*)
 			from (
 				select ir.id from index_record as ir
-				inner join node as n on n.id = node_id
+				inner join node as n on n.id = ir.node_id
 				where %s
 			) as r`, where)
 
@@ -124,7 +124,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			from index_record as ir
 			inner join node as n on n.id = ir.node_id
 			where %s
-			order by score desc, id
+			order by score desc, ir.id
 			offset $%d limit $%d`, qrPrm, qrPrm, kwFmt, where, len(params)+1, len(params)+2)
 
 	} else {

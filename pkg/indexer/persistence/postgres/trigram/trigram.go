@@ -105,7 +105,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			from index_record as ir
 			inner join node as n on n.id = ir.node_id
 			where %s
-			order by ir.score desc, ir.id
+			order by score desc, ir.id
 			offset $%d limit $%d`, qrPrm, where, len(params)+1, len(params)+2)
 
 	} else {
