@@ -22,6 +22,7 @@ import (
 	"github.com/acquirecloud/golibs/logging"
 	"github.com/jmoiron/sqlx"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
+	"github.com/simila-io/simila/pkg/ql"
 	"os"
 	"strings"
 	"time"
@@ -30,9 +31,14 @@ import (
 type (
 	// Db implements persistence.Db
 	Db struct {
-		logger   logging.Logger
+		logger logging.Logger
+		dbe    dbExt
+		db     *sqlx.DB
+	}
+
+	dbExt struct {
 		searchFn SearchFn
-		db       *sqlx.DB
+		tr       ql.Translator
 	}
 
 	// SearchFn is used to provide different search implementations
@@ -57,13 +63,13 @@ type (
 
 	// modelTx is a helper to persist persistence objects ModelTx
 	modelTx struct {
-		searchFn SearchFn
-		*tx      // the active transaction, never nil for the object
+		dbe dbExt
+		*tx // the active transaction, never nil for the object
 	}
 )
 
-func newDb(sdb *sqlx.DB, searchFn SearchFn) *Db {
-	return &Db{db: sdb, searchFn: searchFn, logger: logging.NewLogger("db.postgres")}
+func newDb(sdb *sqlx.DB, dbe dbExt) *Db {
+	return &Db{db: sdb, dbe: dbe, logger: logging.NewLogger("db.postgres")}
 }
 
 // Init implements linker.Initializer interface
@@ -87,7 +93,7 @@ func (d *Db) Shutdown() {
 
 // NewModelTx returns the new ModelTx object
 func (d *Db) NewModelTx(ctx context.Context) persistence.ModelTx {
-	return &modelTx{tx: d.NewTx(ctx).(*tx), searchFn: d.searchFn}
+	return &modelTx{tx: d.NewTx(ctx).(*tx), dbe: d.dbe}
 }
 
 // NewTx returns the new Tx object
@@ -202,7 +208,9 @@ func (m *modelTx) ListFormats() ([]persistence.Format, error) {
 	if err != nil {
 		return nil, persistence.MapError(err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 	return persistence.ScanRows[persistence.Format](rows)
 }
 
@@ -271,7 +279,9 @@ func (m *modelTx) ListNodes(path string) ([]persistence.Node, error) {
 	if err != nil {
 		return nil, persistence.MapError(err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 	return persistence.ScanRows[persistence.Node](rows)
 }
 
@@ -280,7 +290,9 @@ func (m *modelTx) ListChildren(path string) ([]persistence.Node, error) {
 	if err != nil {
 		return nil, persistence.MapError(err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 	return persistence.ScanRows[persistence.Node](rows)
 }
 
@@ -324,26 +336,33 @@ func (m *modelTx) UpdateNode(node persistence.Node) error {
 	return nil
 }
 
-func (m *modelTx) DeleteNode(nID int64, force bool) error {
-	if !force {
-		childCount, err := persistence.Count(m.ctx, m.executor(),
-			"select count (*) "+
-				"from node, (select * from node where id = $1) as n "+
-				"where n.flags = $2 and node.path like concat(n.path, n.name, '/', '%%')",
-			nID, persistence.NodeFlagFolder)
+func (m *modelTx) DeleteNodes(query persistence.DeleteNodesQuery) error {
+	var sb strings.Builder
+	if err := m.dbe.tr.Translate(&sb, query.FilterConditions); err != nil {
+		return err
+	}
+	filter := sb.String()
+	if !query.Force {
+		rows, err := m.db.Query(
+			"select n2.id "+
+				"from node as n2, (select * from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1"+
+				"where n1.flags = $1 and n2.path like concat(n1.path, '/%') and n2.id not in (select n.id from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") limit 1",
+			persistence.NodeFlagFolder)
 		if err != nil {
 			return persistence.MapError(err)
 		}
-		if childCount > 0 {
-			return fmt.Errorf("delete node with ID=%d failed (force=%t), "+
-				"the node has children: %w", nID, force, errors.ErrConflict)
+		defer func() {
+			_ = rows.Close()
+		}()
+		if rows.Next() {
+			return fmt.Errorf("some deleted nodes have children, that don't match the condition: %w", errors.ErrConflict)
 		}
 	}
 	res, err := m.executor().ExecContext(m.ctx,
-		"delete from node "+
-			"using (select * from node where id = $1) as n "+
-			"where node.id = n.id or (n.flags = $2 and node.path like concat(n.path, n.name, '/', '%%'))",
-		nID, persistence.NodeFlagFolder)
+		"delete from node as n2 "+
+			"using (select * from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1"+
+			"where n2.id = n1.id or (n1.flags = $1 and n2.path like concat(n1.path, '/%'))",
+		persistence.NodeFlagFolder)
 	if err != nil {
 		return persistence.MapError(err)
 	}
@@ -499,7 +518,9 @@ func (m *modelTx) QueryIndexRecords(query persistence.IndexRecordQuery) (persist
 	if err != nil {
 		return persistence.QueryResult[persistence.IndexRecord, string]{Total: total}, persistence.MapError(err)
 	}
-
+	defer func() {
+		_ = rows.Close()
+	}()
 	// results
 	res, err := persistence.ScanRowsQueryResult[persistence.IndexRecord](rows)
 	if err != nil {
@@ -517,8 +538,8 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQuery
 	if len(query.TextQuery) == 0 {
 		return persistence.SearchQueryResult{}, fmt.Errorf("text query must be non-empty: %w", errors.ErrInvalid)
 	}
-	if m.searchFn != nil {
-		return m.searchFn(m.ctx, m.executor(), query)
+	if m.dbe.searchFn != nil {
+		return m.dbe.searchFn(m.ctx, m.executor(), query)
 	}
 	return persistence.SearchQueryResult{}, errors.ErrUnimplemented
 }

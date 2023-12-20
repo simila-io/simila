@@ -44,7 +44,8 @@ func createSegmentIndex(id string, rollback bool) *migrate.Migration {
 	return m
 }
 
-var fcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
+// FcTranslator is the filter conditions translator from simila QL to the Postgres dialect
+var FcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
 
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the "groonga" search module to work,
@@ -62,7 +63,7 @@ func Migrations(rollback bool) []*migrate.Migration {
 // see https://pgroonga.github.io/reference/operators/query-v2.html.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
-	if err := fcTranslator.Translate(&sb, q.FilterConditions); err != nil {
+	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
 	if sb.Len() > 0 {
@@ -82,28 +83,28 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if q.GroupByPathOff {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select index_record.id from index_record
-				inner join node as n on n.id = node_id
+				select ir.id from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s
 			) as r`, where)
 
-		query = fmt.Sprintf(`select index_record.*,
+		query = fmt.Sprintf(`select ir.*,
 			concat(n.path, n.name) as path,
-			(pgroonga_score(index_record.tableoid, index_record.ctid)*rank_multiplier) as score,
-			pgroonga_highlight_html(segment, pgroonga_query_extract_keywords($%d)) as matched_keywords
-			from index_record
-			inner join node as n on n.id = node_id
+			(pgroonga_score(ir.tableoid, ir.ctid)*ir.rank_multiplier) as score,
+			pgroonga_highlight_html(ir.segment, pgroonga_query_extract_keywords($%d)) as matched_keywords
+			from index_record as ir
+			inner join node as n on n.id = ir.node_id
 			where %s
-			order by score desc, id
+			order by ir.score desc, ir.id
 			offset $%d limit $%d`, qrPrm, where, len(params)+1, len(params)+2)
 
 	} else {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select node_id from index_record
-				inner join node as n on n.id = node_id
+				select ir.node_id from index_record as ir
+				inner join node as n on n.id =ir.node_id
 				where %s 
-				group by node_id
+				group by ir.node_id
 			) as r`, where)
 
 		query = fmt.Sprintf(`select distinct on(score, path) index_record.*,
@@ -111,13 +112,13 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			r.score as score,
 			pgroonga_highlight_html(segment, pgroonga_query_extract_keywords($%d)) as matched_keywords
 			from (
-				select node_id,
+				select ir.node_id,
 				concat(n.path, n.name) as fullpath,
-				max(pgroonga_score(index_record.tableoid, index_record.ctid)*rank_multiplier) as score
-				from index_record
-				inner join node as n on n.id = node_id
+				max(pgroonga_score(ir.tableoid, ir.ctid)*ir.rank_multiplier) as score
+				from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s
-				group by node_id, fullpath
+				group by ir.node_id, fullpath
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			(pgroonga_score(index_record.tableoid, index_record.ctid)*rank_multiplier) = r.score
@@ -140,7 +141,9 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
-
+	defer func() {
+		_ = rows.Close()
+	}()
 	// results
 	res, err := persistence.ScanRowsQueryResultAndMap(rows,
 		persistence.MapKeywordsToListFn("<span class=\"keyword\">", "</span>"))

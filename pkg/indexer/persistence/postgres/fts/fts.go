@@ -43,7 +43,8 @@ alter table "index_record" drop column if exists "segment_tsvector";
 `
 )
 
-var fcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
+// FcTranslator is the filter conditions translator from simila QL to the Postgres dialect
+var FcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
 
 // TODO: we can extend public.simila TS configuration with other dictionaries,
 // this will produce more lexems and help with search, but it will increase the
@@ -90,7 +91,7 @@ func Migrations(rollback bool) []*migrate.Migration {
 // see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
-	if err := fcTranslator.Translate(&sb, q.FilterConditions); err != nil {
+	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
 	if sb.Len() > 0 {
@@ -111,17 +112,17 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if q.GroupByPathOff {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select index_record.id from index_record
+				select ir.id from index_record as ir
 				inner join node as n on n.id = node_id
 				where %s
 			) as r`, where)
 
-		query = fmt.Sprintf(`select index_record.*,
+		query = fmt.Sprintf(`select ir.*,
 			concat(n.path, n.name) as path,
-			(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score,
-			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
-			from index_record
-			inner join node as n on n.id = node_id
+			(ts_rank_cd(ir.segment_tsvector, websearch_to_tsquery('simila', $%d))*ir.rank_multiplier) as score,
+			ts_headline('simila', ir.segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
+			from index_record as ir
+			inner join node as n on n.id = ir.node_id
 			where %s
 			order by score desc, id
 			offset $%d limit $%d`, qrPrm, qrPrm, kwFmt, where, len(params)+1, len(params)+2)
@@ -129,24 +130,24 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	} else {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select node_id from index_record
-				inner join node as n on n.id = node_id
+				select ir.node_id from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s 
-				group by node_id
+				group by ir.node_id
 			) as r`, where)
 
 		query = fmt.Sprintf(`select distinct on(score, path) index_record.*,
 			r.fullpath as path,
 			r.score as score,
-			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
+			ts_headline('simila', ir.segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
 			from (
-				select node_id,
+				select ir.node_id,
 				concat(n.path, n.name) as fullpath,
-				max(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score
-				from index_record
-				inner join node as n on n.id = node_id
+				max(ts_rank_cd(ir.segment_tsvector, websearch_to_tsquery('simila', $%d))*ir.rank_multiplier) as score
+				from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s
-				group by node_id, fullpath
+				group by ir.node_id, fullpath
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) = r.score
@@ -169,7 +170,9 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
-
+	defer func() {
+		_ = rows.Close()
+	}()
 	// results
 	res, err := persistence.ScanRowsQueryResultAndMap(rows,
 		persistence.MapKeywordsToListFn("<<", ">>"))

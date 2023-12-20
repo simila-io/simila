@@ -62,13 +62,14 @@ type (
 		GetNode(fqnp string) (Node, error)
 		// UpdateNode updates node data
 		UpdateNode(node Node) error
-		// DeleteNode deletes the Node and all records associated with the Node.
-		// force allows to delete folder nodes with children. If the node is folder, and there are children,
+
+		// DeleteNodes deletes the Nodes that matches to the DeleteNodesQuery and all the records associated with the nodes.
+		// force allows to delete folder nodes with children. If the node is a folder, and there are children,
 		// but the force flag is false, the function will return ErrConflict error
 		//
 		// NOTE: The operation is not atomic until an external transaction is not started,
 		// the caller MUST start the transaction before using this method.
-		DeleteNode(nID int64, force bool) error
+		DeleteNodes(DeleteNodesQuery) error
 
 		// UpsertIndexRecords creates or updates index record entries. It returns the new records created
 		UpsertIndexRecords(records ...IndexRecord) (int64, error)

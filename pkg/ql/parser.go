@@ -132,6 +132,10 @@ var (
 		// format identifier is used as LValue of comparable expressions
 		"format": {
 			Flags: PfLValue | PfComparable | PfInLike,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				sb.WriteString("ir.format")
+				return nil
+			},
 		},
 
 		// tag function is written the way -> 'tag("abc") in ["1", "2", "3"]' or 'tag("t1") = "aaa"'

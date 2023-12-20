@@ -93,6 +93,16 @@ type (
 		Total int64
 	}
 
+	// DeleteNodesQuery provides parameters for deleting multiple nodes
+	DeleteNodesQuery struct {
+		// FilterConditions contains the node selection filter
+		FilterConditions string
+		// Force flag allows to delete children for the selected folders. For example, if
+		// the selected node is a folder, and it has children, that don't match the filter criteria,
+		// they also will be deleted if the force is true.
+		Force bool
+	}
+
 	QueryResult[T any, N any] struct {
 		Items  []T
 		NextID N

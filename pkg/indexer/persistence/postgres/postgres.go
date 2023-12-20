@@ -54,14 +54,14 @@ func getDefaultDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 	if err := migrateCommonUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
-	return newDb(db, nil), nil
+	return newDb(db, dbExt{}), nil
 }
 
 func getGroongaDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 	if err := migrateGroongaUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
-	return newDb(db, groonga.Search), nil
+	return newDb(db, dbExt{tr: groonga.FcTranslator, searchFn: groonga.Search}), nil
 }
 
 func getTrigramDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
@@ -71,14 +71,14 @@ func getTrigramDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 	if err := setSessionParams(ctx, db, trigram.SessionParams()); err != nil {
 		return nil, fmt.Errorf("session params set failed: %w", err)
 	}
-	return newDb(db, trigram.Search), nil
+	return newDb(db, dbExt{tr: trigram.FcTranslator, searchFn: trigram.Search}), nil
 }
 
 func getFtsDb(ctx context.Context, db *sqlx.DB) (*Db, error) {
 	if err := migrateFtsUp(ctx, db.DB); err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
-	return newDb(db, fts.Search), nil
+	return newDb(db, dbExt{tr: fts.FcTranslator, searchFn: fts.Search}), nil
 }
 
 func setSessionParams(ctx context.Context, db *sqlx.DB, sessParams map[string]any) error {

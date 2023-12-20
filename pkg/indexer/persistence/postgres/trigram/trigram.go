@@ -45,7 +45,8 @@ func createSegmentIndex(id string, rollback bool) *migrate.Migration {
 	return m
 }
 
-var fcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
+// FcTranslator is the filter conditions translator from simila QL to the Postgres dialect
+var FcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
 
 // Migrations returns migrations to be applied on top of
 // the "common" migrations for the "trigram" search module to work,
@@ -73,7 +74,7 @@ func SessionParams() map[string]any {
 // see https://www.postgresql.org/docs/current/pgtrgm.html.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
-	if err := fcTranslator.Translate(&sb, q.FilterConditions); err != nil {
+	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
 	if sb.Len() > 0 {
@@ -93,40 +94,40 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if q.GroupByPathOff {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select index_record.id from index_record
-				inner join node as n on n.id = node_id
+				select ir.id from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s
 			) as r`, where)
 
-		query = fmt.Sprintf(`select index_record.*,
+		query = fmt.Sprintf(`select ir.*,
 			concat(n.path, n.name) as path,
-			((1 - (segment <->> $%d))*rank_multiplier) as score
-			from index_record
-			inner join node as n on n.id = node_id
+			((1 - (ir.segment <->> $%d))*ir.rank_multiplier) as score
+			from index_record as ir
+			inner join node as n on n.id = ir.node_id
 			where %s
-			order by score desc, id
+			order by ir.score desc, ir.id
 			offset $%d limit $%d`, qrPrm, where, len(params)+1, len(params)+2)
 
 	} else {
 		count = fmt.Sprintf(`select count(*)
 			from (
-				select node_id from index_record
-				inner join node as n on n.id = node_id
+				select ir.node_id from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s 
-				group by node_id
+				group by ir.node_id
 			) as r`, where)
 
 		query = fmt.Sprintf(`select distinct on(score, path) index_record.*,
 			r.fullpath as path,
 			r.score as score
 			from (
-				select node_id,
+				select ir.node_id,
 				concat(n.path, n.name) as fullpath,
-				max((1 - (segment <->> $%d))*rank_multiplier) as score
-				from index_record
-				inner join node as n on n.id = node_id
+				max((1 - (ir.segment <->> $%d))*ir.rank_multiplier) as score
+				from index_record as ir
+				inner join node as n on n.id = ir.node_id
 				where %s
-				group by node_id, fullpath
+				group by ir.node_id, fullpath
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			((1 - (segment <->> $%d))*rank_multiplier) = r.score
@@ -149,7 +150,9 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 	if err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
-
+	defer func() {
+		_ = rows.Close()
+	}()
 	// results
 	res, err := persistence.ScanRowsQueryResultAndMap(rows, mapKeywordsToListFn(q.TextQuery))
 	if err != nil {
