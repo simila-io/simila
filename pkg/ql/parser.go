@@ -81,7 +81,7 @@ type (
 		Translate func(tr Translator, sb *strings.Builder, p Param) error
 	}
 
-	// Translator struct allows to turn AST objects (Expresssion, Condition etc.) to
+	// Translator struct allows to turn AST objects (Expression, Condition etc.) to
 	// the SQL statements according to the dialect provided
 	Translator struct {
 		dialects map[string]Dialect
@@ -104,12 +104,13 @@ var (
 		participle.CaseInsensitive("Keyword"),
 	)
 
-	// SearchDialect is the setting that can be used in the search DB queries with the following assumptions:
-	SearchDialect = map[string]Dialect{
+	// PqFilterConditionsDialect is a set of specific dialects for
+	// translating filter conditions into Postgres where condition.
+	PqFilterConditionsDialect = map[string]Dialect{
 		StringParamID: {
 			Flags: PfRValue | PfComparable, // strings are rvalues only
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
-				// in Postres we use single quotes for string constants
+				// use single quotes for string constants
 				sb.WriteString("'")
 				sb.WriteString(p.Const.String)
 				sb.WriteString("'")
@@ -120,9 +121,13 @@ var (
 		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
 
 		// path identifier, maybe a part of operations like `path = "/org1/folders1/doc1.txt"` etc.
-		// It doesn't contain Translation() function, cause is a part of where query exatctly same name
+		// It doesn't contain Translation() function, cause is a part of where query exactly same name
 		"path": {
 			Flags: PfLValue | PfComparable | PfInArray,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				sb.WriteString("concat(n.path, n.name)")
+				return nil
+			},
 		},
 
 		// format identifier is used as LValue of comparable expressions
@@ -146,25 +151,8 @@ var (
 				if p.Function.Params[0].Const.String == "" {
 					return fmt.Errorf("tag() expects the tag name, which cannot be empty: %w", errors.ErrInvalid)
 				}
-				sb.WriteString("n.tags -> ")
-				tr.Param2Sql(sb, p.Function.Params[0])
-				return nil
-			},
-		},
-
-		// text function contains the text expression to be searched
-		"text": {
-			Flags: PfLValue | PfNop,
-			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
-				if p.Function == nil {
-					return fmt.Errorf("text must be a function: %w", errors.ErrInvalid)
-				}
-				if len(p.Function.Params) != 1 {
-					return fmt.Errorf("text() function expects only one parameter: %w", errors.ErrInvalid)
-				}
-				sb.WriteString(" segment_tsvector @@ websearch_to_tsquery('simila', ")
-				tr.Param2Sql(sb, p.Function.Params[0])
-				sb.WriteString(") ")
+				sb.WriteString("n.tags ->> ")
+				_ = tr.Param2Sql(sb, p.Function.Params[0])
 				return nil
 			},
 		},
@@ -180,9 +168,9 @@ var (
 					return fmt.Errorf("prefix(s, p) function expects two parameters: %w", errors.ErrInvalid)
 				}
 				sb.WriteString(" position(")
-				tr.Param2Sql(sb, p.Function.Params[1])
+				_ = tr.Param2Sql(sb, p.Function.Params[1])
 				sb.WriteString(" in ")
-				tr.Param2Sql(sb, p.Function.Params[0])
+				_ = tr.Param2Sql(sb, p.Function.Params[0])
 				sb.WriteString(") = 1")
 				return nil
 			},
@@ -207,7 +195,7 @@ const (
 	PfInArray = 1 << 4
 )
 
-// NewTranslator creates new Trnasloator with dialects provided
+// NewTranslator creates new Translator with dialects provided
 func NewTranslator(dialects map[string]Dialect) Translator {
 	return Translator{dialects: dialects}
 }
@@ -268,6 +256,22 @@ func (c Const) Value() string {
 		return fmt.Sprintf("%q", c.String)
 	}
 	return fmt.Sprintf("%f", c.Number)
+}
+
+// Translate translates the expression string to string according to the dialect of the translator
+func (tr Translator) Translate(sb *strings.Builder, expr string) error {
+	expr = strings.TrimSpace(expr)
+	if len(expr) == 0 {
+		return nil
+	}
+	e, err := parser.ParseString("", expr)
+	if err != nil {
+		return fmt.Errorf("failed to parse expression=%q: %w", expr, err)
+	}
+	if err = tr.Expression2Sql(sb, e); err != nil {
+		return fmt.Errorf("failed to translate expression=%q: %w", expr, err)
+	}
+	return nil
 }
 
 // Expression2Sql turns the AST object e to the query string according to the dialect of the translator
@@ -385,7 +389,7 @@ func (tr Translator) Param2Sql(sb *strings.Builder, p *Param) error {
 		return nil
 	}
 	sb.WriteString("(")
-	tr.Params2Sql(sb, p.Function.Params)
+	_ = tr.Params2Sql(sb, p.Function.Params)
 	sb.WriteString(")")
 	return nil
 }

@@ -250,13 +250,11 @@ func (s *Service) search(ctx context.Context, request *index.SearchRecordsReques
 	}()
 	res := &index.SearchRecordsResult{}
 	q := persistence.SearchQuery{
-		Path:   request.Path,
-		Format: request.Format,
-		Query:  request.Text,
-		Tags:   request.Tags,
-		Strict: cast.Value(request.Strict, false),
-		Offset: int(cast.Value(request.Offset, 0)),
-		Limit:  int(cast.Value(request.Limit, 0)),
+		TextQuery:        request.TextQuery,
+		FilterConditions: request.FilterConditions,
+		GroupByPathOff:   cast.Value(request.GroupByPathOff, false),
+		Offset:           int(cast.Value(request.Offset, 0)),
+		Limit:            int(cast.Value(request.Limit, 0)),
 	}
 	if q.Limit < 1 || q.Limit > 1000 {
 		q.Limit = 1000

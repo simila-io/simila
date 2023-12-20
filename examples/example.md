@@ -92,25 +92,25 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs/5678" | jq
 Search the organization node children, return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\")", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
-Search the organization node children with filter via tags (the `public` tag), return the most relevant record per node only:
+Search the organization node children with tags filter (the `public` tag), return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {"public":"true"}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\") and tag(\"public\") = \"true\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
-Search the organization node children with filter via format (record type), return the most relevant record per node only:
+Search the organization node children with format filter, return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "format": "organizationsMeta", "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\") and format = \"organizationsMeta\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 Search the `Coca-Cola Company` balance node only, return all the matched records for the node:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 ### 6. Add, update and delete searchable records of a node
@@ -126,7 +126,7 @@ curl -s -XPATCH -H "content-type: application/json" -d "{ \"upsertRecords\": [{\
 Search the `Coca-Cola Company` balance node only, check that the records have changed:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs/1234/balance.xlsx", "tags": {}, "strict":true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 ### 8. Delete nodes
@@ -150,5 +150,5 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
 Search the organization node children, only the `Ford Motors Company` records are expected:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"text": "company", "path":"/orgs", "tags": {}, "strict":false, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\")", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```

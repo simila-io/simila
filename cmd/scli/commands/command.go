@@ -208,28 +208,22 @@ func (c cmdSearch) Run(prompt string) error {
 	params := parseParams(prompt)
 	for k, v := range params {
 		switch k {
-		case "text":
-			req.Text = strings.Trim(v, Spaces)
-		case "tags":
-			tags := map[string]string{}
-			if err := json.Unmarshal(cast.StringToByteArray(v), &tags); err != nil {
-				return fmt.Errorf("the tags value %q is wrong. Expecting tags to be a json map", v)
+		case "textQuery":
+			req.TextQuery = strings.Trim(v, Spaces)
+		case "filterConditions":
+			req.FilterConditions = strings.Trim(v, Spaces)
+		case "groupByPathOff":
+			var flag bool
+			if err := json.Unmarshal(cast.StringToByteArray(v), &flag); err != nil {
+				return fmt.Errorf("the groupByPathOff value %s is wrong. It must be a boolean value true/false", v)
 			}
-			req.Tags = tags
-		case "path":
-			req.Path = strings.Trim(v, Spaces)
+			req.GroupByPathOff = cast.Ptr(flag)
 		case "limit":
 			var limit int
 			if err := json.Unmarshal(cast.StringToByteArray(v), &limit); err != nil || limit <= 0 {
-				return fmt.Errorf("the limit value %s is wrong. limit must be a positive number", v)
+				return fmt.Errorf("the limit value %s is wrong. It must be a positive number", v)
 			}
 			req.Limit = cast.Ptr(int64(limit))
-		case "strict":
-			var dist bool
-			if err := json.Unmarshal(cast.StringToByteArray(v), &dist); err != nil {
-				return fmt.Errorf("the strict value %s is wrong. distinct must be a boolean value true/false", v)
-			}
-			req.Strict = cast.Ptr(dist)
 		case "as-table":
 			if err := json.Unmarshal(cast.StringToByteArray(v), &asTable); err != nil {
 				return fmt.Errorf("the as-table value %s is wrong. It must be a boolean value true/false", v)
@@ -297,10 +291,9 @@ func (c cmdSearch) description() string {
 	return `
 search <params> - returns the search results. It accepts the following params:
 
-	text=<string> - the query text
-	tags={"a":"a", "b":"b"} - the indexes with the tags values
-	path=<string> - FQNP the path to the node to run the search for
-	strict=<bool> - run the search for the node only (excluding its children, if any)
+	textQuery=<string> - the text query
+	filterConditions=<string> - the filter conditions
+	groupByPathOff=<bool> - the flag turns off results grouping by path
 	limit=<int> - the number of records in the response
 	as-table=<bool> - prints the result in a table form
 `

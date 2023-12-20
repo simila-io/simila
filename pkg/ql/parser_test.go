@@ -188,8 +188,8 @@ func TestDialects(t *testing.T) {
 	assert.Equal(t, "unary123('hello world') AND (table.param1 != 234.000000 OR table.param2 IN [1.000000, 2.000000])", sb.String())
 }
 
-func TestSearchDialect(t *testing.T) {
-	tr := NewTranslator(SearchDialect)
+func TestPqFilterConditionsDialect(t *testing.T) {
+	tr := NewTranslator(PqFilterConditionsDialect)
 
 	var sb strings.Builder
 	e, err := parser.ParseString("", "tag(1234) = \"234\"")
@@ -204,21 +204,9 @@ func TestSearchDialect(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
 
-	e, err = parser.ParseString("", "text('1234') = \"234\"")
-	assert.Nil(t, err)
-	assert.NotNil(t, tr.Expression2Sql(&sb, e))
-
-	e, err = parser.ParseString("", "text('1234', 1234) ")
-	assert.Nil(t, err)
-	assert.NotNil(t, tr.Expression2Sql(&sb, e))
-
-	e, err = parser.ParseString("", "text(tag('123')) ")
-	assert.Nil(t, err)
-	assert.Nil(t, tr.Expression2Sql(&sb, e))
-
 	sb.Reset()
-	e, err = parser.ParseString("", "text(tag('123')) and tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3)")
+	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3)")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
-	assert.Equal(t, " segment_tsvector @@ websearch_to_tsquery('simila', n.tags -> '123')  AND n.tags -> 'abc' = n.tags -> 'def' AND ( position('/aaa/' in path) = 1 OR format = 1234.300049)", sb.String())
+	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in concat(n.path, n.name)) = 1 OR format = 1234.300049)", sb.String())
 }

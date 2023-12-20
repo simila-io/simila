@@ -140,17 +140,13 @@ message PatchRecordsResult {
 
 // SearchRecordsRequest describes input parameters for the Search over indexes operation.
 message SearchRecordsRequest {
-  string text = 1;
-  string format = 2;
-  map<string, string> tags = 3;
-  // path contains the path where to run the search. It will be run against all the records in the path sub-tree
-  string path = 4;
-  // strict flag limits the search by the path node only. So the search will not be run in the childrens, but in
-  // th node index records only
-  optional bool strict = 5;
-  optional int64 offset = 6;
+  string textQuery = 1;
+  string filterConditions = 2;
+  //The flag turns off results grouping by path.
+  optional bool groupByPathOff = 3;
+  optional int64 offset = 4;
   // limit specifies the maximum number of records in the result set
-  optional int64 limit = 7;
+  optional int64 limit = 5;
 }
 
 // SearchRecordsResultItem describes search records result item

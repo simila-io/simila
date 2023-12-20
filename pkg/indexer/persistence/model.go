@@ -77,17 +77,11 @@ type (
 	}
 
 	SearchQuery struct {
-		Path   string
-		Format string
-		Query  string // underlying search engine query
-		Tags   Tags   // index tags
-		// Strict defines the search records behavior:
-		// - If true, the search will select between all records associated with the Path node only (Path == "PathXName" for the Node with <PathX, Name> pair)
-		// - If false, the search will select between records in the Path subtree for all records there (every Node where path has Path prefix),
-		// but only one most relevant record per one node (one record per <PathX, Name> pair)
-		Strict bool
-		Offset int
-		Limit  int
+		TextQuery        string
+		FilterConditions string
+		GroupByPathOff   bool // GroupByPathOff turns off results grouping by path.
+		Offset           int
+		Limit            int
 	}
 
 	SearchQueryResultItem struct {

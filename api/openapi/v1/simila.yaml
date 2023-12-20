@@ -427,30 +427,23 @@ components:
           description: The total number of found records.
     SearchRecordsRequest:
       type: object
-      description: The object is used to search text across all the index records.
+      description: The object is used to perform search across the index records.
       required:
-        - text
-        - format
-        - tags
-        - path
-        - strict
+        - textQuery
+        - filterConditions
+        - groupByPathOff
         - offset
         - limit
       properties:
-        text:
+        textQuery:
           type: string
-          description: The text to be found in the records.
-        format:
+          description: The text query.
+        filterConditions:
           type: string
-          description: The format of the records to search for.
-        tags:
-          $ref: '#/components/schemas/Tags'
-        path:
-          type: string
-          description: The node path where the text to be searched for, including the subtrees in case of a folder.
-        strict:
+          description: The filter conditions.
+        groupByPathOff:
           type: boolean
-          description: The strict flag limits the search scope strictly to the node located by the provided path (i.e. subtrees are not included in case of a folder).
+          description: The flag turns off results grouping by path.
         offset:
           type: integer
           description: The number of records to skip before start returning results.

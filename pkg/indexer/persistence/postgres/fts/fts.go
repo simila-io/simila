@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/simila-io/simila/pkg/indexer/persistence"
+	"github.com/simila-io/simila/pkg/ql"
 	"strings"
 )
 
@@ -41,6 +42,8 @@ drop index if exists "idx_index_record_segment_tsvector";
 alter table "index_record" drop column if exists "segment_tsvector";
 `
 )
+
+var fcTranslator = ql.NewTranslator(ql.PqFilterConditionsDialect)
 
 // TODO: we can extend public.simila TS configuration with other dictionaries,
 // this will produce more lexems and help with search, but it will increase the
@@ -83,78 +86,72 @@ func Migrations(rollback bool) []*migrate.Migration {
 
 // Search is an implementation of the postgres.SearchFn
 // function based on the postgres built-in full-text search.
-// Queries must be formed in accordance with the `websearch_to_tsquery()` query syntax,
+// SearchQuery.TextQuery must be formed in accordance with the `websearch_to_tsquery()` query syntax,
 // see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
-func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
-	var params []any
+func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf(" segment_tsvector @@ websearch_to_tsquery('simila', $%d) ", len(params)+1))
-	params = append(params, q.Query)
-
-	if len(q.Format) > 0 {
-		sb.WriteString(fmt.Sprintf(" and format = $%d ", len(params)+1))
-		params = append(params, q.Format)
+	if err := fcTranslator.Translate(&sb, q.FilterConditions); err != nil {
+		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
+	if sb.Len() > 0 {
+		sb.WriteString(" and ")
+	}
+
+	var params []any
+	sb.WriteString(fmt.Sprintf(" segment_tsvector @@ websearch_to_tsquery('simila', $%d) ", len(params)+1))
+	params = append(params, q.TextQuery)
+
+	qrPrm := 1
+	kwFmt := "MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>"
+	where := sb.String()
 
 	var count string
 	var query string
 
-	qrPrm := 1
-	kwFmt := "MaxFragments=10, MaxWords=7, MinWords=1, StartSel=<<, StopSel=>>"
+	if q.GroupByPathOff {
+		count = fmt.Sprintf(`select count(*)
+			from (
+				select index_record.id from index_record
+				inner join node as n on n.id = node_id
+				where %s
+			) as r`, where)
 
-	if q.Strict {
-		sb.WriteString(fmt.Sprintf(" and node_id = $%d and n.tags @> $%d ", len(params)+1, len(params)+2))
-		params = append(params, r.ID, q.Tags.JSON())
-
-		where := sb.String()
-		count = fmt.Sprintf("select count(*) from index_record "+
-			"inner join node as n on n.id = node_id "+
-			"where %s", where)
-
-		query = fmt.Sprintf("select index_record.*, "+
-			"concat(n.path, n.name) as path, "+
-			"(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score, "+
-			"ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
-			"from index_record "+
-			"inner join node as n on n.id = node_id "+
-			"where %s "+
-			"order by score desc, id "+
-			"offset $%d limit $%d", qrPrm, qrPrm, kwFmt, where, len(params)+1, len(params)+2)
+		query = fmt.Sprintf(`select index_record.*,
+			concat(n.path, n.name) as path,
+			(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score,
+			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
+			from index_record
+			inner join node as n on n.id = node_id
+			where %s
+			order by score desc, id
+			offset $%d limit $%d`, qrPrm, qrPrm, kwFmt, where, len(params)+1, len(params)+2)
 
 	} else {
-		if r.Flags == persistence.NodeFlagDocument {
-			sb.WriteString(fmt.Sprintf(" and node_id = $%d and n.tags @> $%d ", len(params)+1, len(params)+2))
-			params = append(params, r.ID, q.Tags.JSON())
-		} else {
-			sb.WriteString(fmt.Sprintf(" and node_id in (select id from node "+
-				"where path like concat($%d::text, '%%') and tags @> $%d) ", len(params)+1, len(params)+2))
-			params = append(params, persistence.ToNodePath(q.Path), q.Tags.JSON())
-		}
+		count = fmt.Sprintf(`select count(*)
+			from (
+				select node_id from index_record
+				inner join node as n on n.id = node_id
+				where %s 
+				group by node_id
+			) as r`, where)
 
-		where := sb.String()
-		count = fmt.Sprintf("select count(distinct node_id) from index_record "+
-			"inner join node as n on n.id = node_id "+
-			"where %s", where)
-
-		query = fmt.Sprintf("select distinct on(score, path) index_record.*, "+
-			"concat(n.path, n.name) as path, "+
-			"r.score as score, "+
-			"ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords "+
-			"from ("+
-			//
-			"select node_id, "+
-			"max(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score "+
-			"from index_record "+
-			"where %s "+
-			"group by node_id"+
-			//
-			") as r "+
-			"inner join index_record on index_record.node_id = r.node_id and "+
-			"(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) = r.score "+
-			"inner join node as n on n.id = r.node_id "+
-			"order by score desc, path, id "+
-			"offset $%d limit $%d", qrPrm, kwFmt, qrPrm, where, qrPrm, len(params)+1, len(params)+2)
+		query = fmt.Sprintf(`select distinct on(score, path) index_record.*,
+			r.fullpath as path,
+			r.score as score,
+			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
+			from (
+				select node_id,
+				concat(n.path, n.name) as fullpath,
+				max(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) as score
+				from index_record
+				inner join node as n on n.id = node_id
+				where %s
+				group by node_id, fullpath
+			) as r
+			inner join index_record on index_record.node_id = r.node_id and
+			(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) = r.score
+			order by score desc, path, id
+			offset $%d limit $%d`, qrPrm, kwFmt, qrPrm, where, qrPrm, len(params)+1, len(params)+2)
 	}
 
 	// count
@@ -168,7 +165,6 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, r persistence.Node, q p
 		return persistence.SearchQueryResult{Total: total}, nil
 	}
 	params = append(params, q.Offset, q.Limit)
-
 	rows, err := qx.QueryxContext(ctx, query, params...)
 	if err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
