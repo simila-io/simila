@@ -58,8 +58,20 @@ func (r *Rest) UpdateNode(c *gin.Context, path similapi.Path) {
 	c.Status(http.StatusOK)
 }
 
-func (r *Rest) DeleteNode(c *gin.Context, path similapi.Path) {
-	_, err := r.svc.IndexServiceServer().DeleteNode(c, &index.Path{Path: persistence.ConcatPath(path, "")})
+func (r *Rest) DeleteNodes(c *gin.Context) {
+	var dnr similapi.DeleteNodesRequest
+	if r.errorRespnse(c, BindAppJson(c, &dnr), "") {
+		return
+	}
+	_, err := r.svc.IndexServiceServer().DeleteNodes(c, &index.DeleteNodesRequest{FilterConditions: dnr.FilterConditions, Force: cast.Ptr(dnr.Force)})
+	if r.errorRespnse(c, err, "") {
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (r *Rest) DeleteNode(c *gin.Context, path similapi.Path, params similapi.DeleteNodeParams) {
+	_, err := r.svc.IndexServiceServer().DeleteNodes(c, &index.DeleteNodesRequest{FilterConditions: fmt.Sprintf("path like '%s%%'", path), Force: params.Force})
 	if r.errorRespnse(c, err, "") {
 		return
 	}

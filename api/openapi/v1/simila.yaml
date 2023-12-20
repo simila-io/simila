@@ -91,6 +91,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListNodesResult'
+    delete:
+      tags:
+        - Nodes
+      summary: Delete multiple nodes
+      description: The call allows to delete multiple nodes which meet the filter conditions
+      operationId: DeleteNodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteNodesRequest'
+      responses:
+        204:
+          description: Some nodes were deleted
+        400:
+          description: The operation cannot be performed
   /nodes/{path}:
     put:
       tags:
@@ -119,6 +136,7 @@ paths:
       operationId: DeleteNode
       parameters:
         - $ref: '#/components/parameters/Path'
+        - $ref: '#/components/parameters/Force'
       responses:
         204:
           description: The node was deleted successfully.
@@ -425,6 +443,19 @@ components:
         total:
           type: integer
           description: The total number of found records.
+    DeleteNodesRequest:
+      type: object
+      description: The object is used to delete multiple nodes at a time
+      required:
+        - filterConditions
+        - force
+      properties:
+        filterConditions:
+          type: string
+          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or path like "/org%"))`.
+        force:
+          type: boolean
+          description: The flag allows to delete children of a matched node, even if they don't meet the filter criteria
     SearchRecordsRequest:
       type: object
       description: The object is used to perform search across the index records.
@@ -560,3 +591,10 @@ components:
       required: false
       schema:
         type: string
+    Force:
+      in: query
+      name: force
+      description: force flag specifies whether the operation will force the request.
+      required: false
+      schema:
+        type: boolean

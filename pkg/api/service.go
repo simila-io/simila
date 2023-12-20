@@ -181,15 +181,16 @@ func (s *Service) updateNode(ctx context.Context, request *index.UpdateNodeReque
 	return res, nil
 }
 
-func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) (*emptypb.Empty, error) {
-	s.logger.Infof("deleteNode(): path=%q, force=%t", path.Path, force)
+func (s *Service) deleteNodes(ctx context.Context, dnr *index.DeleteNodesRequest) (*emptypb.Empty, error) {
+	force := cast.Value(dnr.Force, false)
+	s.logger.Infof("deleteNodes(): filter=%q, force=%t", dnr.FilterConditions, force)
 	mtx := s.Db.NewModelTx(ctx)
 	mtx.MustBegin()
 	defer func() {
 		_ = mtx.Rollback()
 	}()
 	res := &emptypb.Empty{}
-	err := mtx.DeleteNodes(persistence.DeleteNodesQuery{FilterConditions: fmt.Sprintf("path = %s", path.Path), Force: force})
+	err := mtx.DeleteNodes(persistence.DeleteNodesQuery{FilterConditions: dnr.FilterConditions, Force: force})
 	if err != nil {
 		return res, errors.GRPCWrap(err)
 	}
@@ -360,8 +361,8 @@ func (ids idxService) UpdateNode(ctx context.Context, request *index.UpdateNodeR
 	return ids.s.updateNode(ctx, request)
 }
 
-func (ids idxService) DeleteNode(ctx context.Context, path *index.Path) (*emptypb.Empty, error) {
-	return ids.s.deleteNode(ctx, path, true)
+func (ids idxService) DeleteNodes(ctx context.Context, dnr *index.DeleteNodesRequest) (*emptypb.Empty, error) {
+	return ids.s.deleteNodes(ctx, dnr)
 }
 
 func (ids idxService) ListNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
