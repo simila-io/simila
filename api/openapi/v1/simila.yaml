@@ -437,10 +437,10 @@ components:
       properties:
         textQuery:
           type: string
-          description: The text query.
+          description: The text query. The query must be formed in accordance with the query language of the underlying search engine.
         filterConditions:
           type: string
-          description: The filter conditions.
+          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or prefix(path, "/org"))`.
         groupByPathOff:
           type: boolean
           description: The flag turns off results grouping by path.

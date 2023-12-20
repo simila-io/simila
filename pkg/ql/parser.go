@@ -121,7 +121,6 @@ var (
 		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
 
 		// path identifier, maybe a part of operations like `path = "/org1/folders1/doc1.txt"` etc.
-		// It doesn't contain Translation() function, cause is a part of where query exactly same name
 		"path": {
 			Flags: PfLValue | PfComparable | PfInArray,
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
