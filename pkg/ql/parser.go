@@ -103,6 +103,91 @@ var (
 		participle.Unquote("String"),
 		participle.CaseInsensitive("Keyword"),
 	)
+
+	// SearchDialect is the setting that can be used in the search DB queries with the following assumptions:
+	SearchDialect = map[string]Dialect{
+		StringParamID: {
+			Flags: PfRValue | PfComparable, // strings are rvalues only
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				// in Postres we use single quotes for string constants
+				sb.WriteString("'")
+				sb.WriteString(p.Const.String)
+				sb.WriteString("'")
+				return nil
+			},
+		},
+		NumberParamID: {Flags: PfRValue | PfComparable}, // numbers are rvalues only
+		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
+
+		// path identifier, maybe a part of operations like `path = "/org1/folders1/doc1.txt"` etc.
+		// It doesn't contain Translation() function, cause is a part of where query exatctly same name
+		"path": {
+			Flags: PfLValue | PfComparable | PfInArray,
+		},
+
+		// format identifier is used as LValue of comparable expressions
+		"format": {
+			Flags: PfLValue | PfComparable | PfInArray,
+		},
+
+		// tag function is written the way -> 'tag("abc") in ["1", "2", "3"]' or 'tag("t1") = "aaa"'
+		"tag": {
+			Flags: PfLValue | PfComparable | PfRValue | PfInArray,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				if p.Function == nil {
+					return fmt.Errorf("tag must be a function: %w", errors.ErrInvalid)
+				}
+				if len(p.Function.Params) != 1 {
+					return fmt.Errorf("tag() function expects only one parameter - the name of the tag: %w", errors.ErrInvalid)
+				}
+				if p.Function.Params[0].Const == nil {
+					return fmt.Errorf("tag() function expects the tag name (string) as the parameter: %w", errors.ErrInvalid)
+				}
+				if p.Function.Params[0].Const.String == "" {
+					return fmt.Errorf("tag() expects the tag name, which cannot be empty: %w", errors.ErrInvalid)
+				}
+				sb.WriteString("n.tags -> ")
+				tr.Param2Sql(sb, p.Function.Params[0])
+				return nil
+			},
+		},
+
+		// text function contains the text expression to be searched
+		"text": {
+			Flags: PfLValue | PfNop,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				if p.Function == nil {
+					return fmt.Errorf("text must be a function: %w", errors.ErrInvalid)
+				}
+				if len(p.Function.Params) != 1 {
+					return fmt.Errorf("text() function expects only one parameter: %w", errors.ErrInvalid)
+				}
+				sb.WriteString(" segment_tsvector @@ websearch_to_tsquery('simila', ")
+				tr.Param2Sql(sb, p.Function.Params[0])
+				sb.WriteString(") ")
+				return nil
+			},
+		},
+
+		// prefix(s, p) returns whether the s has prefix p
+		"prefix": {
+			Flags: PfLValue | PfNop,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				if p.Function == nil {
+					return fmt.Errorf("prefix must be a function: %w", errors.ErrInvalid)
+				}
+				if len(p.Function.Params) != 2 {
+					return fmt.Errorf("prefix(s, p) function expects two parameters: %w", errors.ErrInvalid)
+				}
+				sb.WriteString(" position(")
+				tr.Param2Sql(sb, p.Function.Params[1])
+				sb.WriteString(" in ")
+				tr.Param2Sql(sb, p.Function.Params[0])
+				sb.WriteString(") = 1")
+				return nil
+			},
+		},
+	}
 )
 
 const (
