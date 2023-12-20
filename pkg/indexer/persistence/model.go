@@ -23,13 +23,9 @@ import (
 )
 
 type (
-	Basis json.RawMessage
-
-	Vector json.RawMessage
-
 	Format struct {
 		ID        string    `db:"id"`
-		Basis     Basis     `db:"basis"`
+		Basis     []byte    `db:"basis"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
 	}
@@ -55,7 +51,7 @@ type (
 		ID        string    `db:"id"`
 		NodeID    int64     `db:"node_id"`
 		Segment   string    `db:"segment"`
-		Vector    Vector    `db:"vector"`
+		Vector    []byte    `db:"vector"`
 		Format    string    `db:"format"`
 		RankMult  float64   `db:"rank_multiplier"`
 		CreatedAt time.Time `db:"created_at"`
