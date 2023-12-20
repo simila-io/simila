@@ -189,11 +189,7 @@ func (s *Service) deleteNode(ctx context.Context, path *index.Path, force bool) 
 		_ = mtx.Rollback()
 	}()
 	res := &emptypb.Empty{}
-	n, err := mtx.GetNode(path.Path)
-	if err != nil {
-		return res, errors.GRPCWrap(err)
-	}
-	err = mtx.DeleteNode(n.ID, force)
+	err := mtx.DeleteNodes(persistence.DeleteNodesQuery{FilterConditions: fmt.Sprintf("path = %s", path.Path), Force: force})
 	if err != nil {
 		return res, errors.GRPCWrap(err)
 	}
