@@ -100,7 +100,7 @@ func TestCondition2Sql(t *testing.T) {
 		ArrayParamID:  {Flags: PfRValue},                // arrays are rvalues only
 		"unary":       {Flags: PfLValue | PfNop},
 		"binary":      {Flags: PfLValue | PfComparable},
-		"inonly":      {Flags: PfLValue | PfInArray},
+		"inonly":      {Flags: PfLValue | PfInLike},
 	}
 	tr := NewTranslator(dialects)
 	p := participle.MustBuild[Condition](
@@ -129,7 +129,15 @@ func TestCondition2Sql(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, tr.Condition2Sql(&sb, c))
 
+	c, err = p.ParseString("", "binary() like 'ds'")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
 	c, err = p.ParseString("", "inonly() > 123")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "inonly() like 123")
 	assert.Nil(t, err)
 	assert.NotNil(t, tr.Condition2Sql(&sb, c))
 
@@ -144,6 +152,11 @@ func TestCondition2Sql(t *testing.T) {
 	c, err = p.ParseString("", "inonly() in [1234, 3245]")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Condition2Sql(&sb, c))
+
+	c, err = p.ParseString("", "inonly() like 'asdf'")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Condition2Sql(&sb, c))
+
 }
 
 func TestDialects(t *testing.T) {
@@ -174,7 +187,7 @@ func TestDialects(t *testing.T) {
 			sb.WriteString("table.param1")
 			return nil
 		}},
-		"inonly": {Flags: PfLValue | PfInArray, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+		"inonly": {Flags: PfLValue | PfInLike, Translate: func(tr Translator, sb *strings.Builder, p Param) error {
 			sb.WriteString("table.param2")
 			return nil
 		}},
@@ -205,8 +218,8 @@ func TestPqFilterConditionsDialect(t *testing.T) {
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
 
 	sb.Reset()
-	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3)")
+	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3) or format like \"aaa%\"")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
-	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in concat(n.path, n.name)) = 1 OR format = 1234.300049)", sb.String())
+	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in concat(n.path, n.name)) = 1 OR format = 1234.300049) OR format LIKE 'aaa%'", sb.String())
 }

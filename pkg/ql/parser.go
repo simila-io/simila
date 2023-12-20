@@ -44,7 +44,7 @@ type (
 	// optional operation and second param (optional)
 	Condition struct {
 		FirstParam  Param  `  @@`
-		Op          string ` {@("<"|">"|">="|"<="|"!="|"="|"IN")`
+		Op          string ` {@("<"|">"|">="|"<="|"!="|"="|"IN"|"LIKE")`
 		SecondParam *Param ` @@}`
 	}
 
@@ -90,7 +90,7 @@ type (
 
 var (
 	sqlLexer = lexer.MustSimple([]lexer.SimpleRule{
-		{`Keyword`, `(?i)\b(AND|OR|NOT|IN)\b`},
+		{`Keyword`, `(?i)\b(AND|OR|NOT|IN|LIKE)\b`},
 		{`Ident`, `[a-zA-Z_][a-zA-Z0-9_]*`},
 		{`Number`, `[-+]?\d*\.?\d+([eE][-+]?\d+)?`},
 		{`String`, `'[^']*'|"[^"]*"`},
@@ -122,7 +122,7 @@ var (
 
 		// path identifier, maybe a part of operations like `path = "/org1/folders1/doc1.txt"` etc.
 		"path": {
-			Flags: PfLValue | PfComparable | PfInArray,
+			Flags: PfLValue | PfComparable | PfInLike,
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
 				sb.WriteString("concat(n.path, n.name)")
 				return nil
@@ -131,12 +131,12 @@ var (
 
 		// format identifier is used as LValue of comparable expressions
 		"format": {
-			Flags: PfLValue | PfComparable | PfInArray,
+			Flags: PfLValue | PfComparable | PfInLike,
 		},
 
 		// tag function is written the way -> 'tag("abc") in ["1", "2", "3"]' or 'tag("t1") = "aaa"'
 		"tag": {
-			Flags: PfLValue | PfComparable | PfRValue | PfInArray,
+			Flags: PfLValue | PfComparable | PfRValue | PfInLike,
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
 				if p.Function == nil {
 					return fmt.Errorf("tag must be a function: %w", errors.ErrInvalid)
@@ -144,11 +144,8 @@ var (
 				if len(p.Function.Params) != 1 {
 					return fmt.Errorf("tag() function expects only one parameter - the name of the tag: %w", errors.ErrInvalid)
 				}
-				if p.Function.Params[0].Const == nil {
+				if p.Function.Params[0].id() != StringParamID {
 					return fmt.Errorf("tag() function expects the tag name (string) as the parameter: %w", errors.ErrInvalid)
-				}
-				if p.Function.Params[0].Const.String == "" {
-					return fmt.Errorf("tag() expects the tag name, which cannot be empty: %w", errors.ErrInvalid)
 				}
 				sb.WriteString("n.tags ->> ")
 				_ = tr.Param2Sql(sb, p.Function.Params[0])
@@ -190,8 +187,8 @@ const (
 	PfNop = 1 << 2
 	// PfComparable the parameter can be compared: <, >, !=, =, >=, <=
 	PfComparable = 1 << 3
-	// PfInArray the IN operation is allowed for the param
-	PfInArray = 1 << 4
+	// PfInLike the IN or LIKE operations are allowed for the param
+	PfInLike = 1 << 4
 )
 
 // NewTranslator creates new Translator with dialects provided
@@ -355,11 +352,18 @@ func (tr Translator) Condition2Sql(sb *strings.Builder, c *Condition) error {
 			return fmt.Errorf("the first parameter %s is not applicable for the operation %s: %w", c.SecondParam.Name(false), c.Op, errors.ErrInvalid)
 		}
 	case "IN":
-		if d.Flags&PfInArray == 0 {
+		if d.Flags&PfInLike == 0 {
 			return fmt.Errorf("the first parameter %s is not applicable for the IN : %w", c.FirstParam.Name(false), errors.ErrInvalid)
 		}
 		if c.SecondParam.id() != ArrayParamID {
 			return fmt.Errorf("the second parameter %s must be an array: %w", c.SecondParam.Name(false), errors.ErrInvalid)
+		}
+	case "LIKE":
+		if d.Flags&PfInLike == 0 {
+			return fmt.Errorf("the first parameter %s is not applicable for the LIKE : %w", c.FirstParam.Name(false), errors.ErrInvalid)
+		}
+		if c.SecondParam.id() != StringParamID {
+			return fmt.Errorf("the right value(%s) of LIKE must be a string: %w", c.SecondParam.Name(false), errors.ErrInvalid)
 		}
 	default:
 		return fmt.Errorf("unknown operation %s: %w", c.Op, errors.ErrInvalid)
