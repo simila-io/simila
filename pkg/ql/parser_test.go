@@ -224,7 +224,6 @@ func TestPqFilterConditionsDialect(t *testing.T) {
 	e, err = parser.ParseString("", "node = \"234\"")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
-
 	sb.Reset()
 	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3) or format like \"aaa%\" or node = '123'")
 	assert.Nil(t, err)

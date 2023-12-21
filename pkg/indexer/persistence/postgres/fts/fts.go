@@ -139,7 +139,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 		query = fmt.Sprintf(`select distinct on(score, path) index_record.*,
 			r.fullpath as path,
 			r.score as score,
-			ts_headline('simila', ir.segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
+			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
 			from (
 				select ir.node_id,
 				concat(n.path, n.name) as fullpath,

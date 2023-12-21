@@ -92,19 +92,19 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs/5678" | jq
 Search the organization node children, return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\")", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/orgs/%\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 Search the organization node children with tags filter (the `public` tag), return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\") and tag(\"public\") = \"true\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/orgs/%\" and tag(\"public\") = \"true\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 Search the organization node children with format filter, return the most relevant record per node only:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\") and format = \"organizationsMeta\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/orgs/%\" and format = \"organizationsMeta\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 Search the `Coca-Cola Company` balance node only, return all the matched records for the node:
@@ -134,7 +134,7 @@ curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", 
 Delete the `Coca-Cola Company` node and all its children nodes and records:
 
 ```bash
-curl -i -XDELETE "http://localhost:8080/v1/nodes/%2Forgs%2F1234"
+curl -i -XDELETE -H "content-type: application/json" -d '{"filterConditions": "path like \"/orgs/1234%\""}' "http://localhost:8080/v1/nodes"
 ```
 
 ### 9. List the nodes after deletion
@@ -150,5 +150,5 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
 Search the organization node children, only the `Ford Motors Company` records are expected:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "prefix(path, \"/orgs/\")", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/orgs/%\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```

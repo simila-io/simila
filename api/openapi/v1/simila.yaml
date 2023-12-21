@@ -96,8 +96,8 @@ paths:
     delete:
       tags:
         - Nodes
-      summary: Delete multiple nodes
-      description: The call allows to delete multiple nodes which meet the filter conditions
+      summary: Delete nodes
+      description: The call allows to delete multiple nodes which meet the filter conditions.
       operationId: DeleteNodes
       requestBody:
         required: true
@@ -107,9 +107,9 @@ paths:
               $ref: '#/components/schemas/DeleteNodesRequest'
       responses:
         204:
-          description: Some nodes were deleted
-        400:
-          description: The operation cannot be performed
+          description: The nodes matching the filter conditions were deleted.
+        409:
+          description: The nodes cannot be deleted due to a conflict.
   /nodes/{path}:
     put:
       tags:
@@ -454,7 +454,7 @@ components:
       properties:
         filterConditions:
           type: string
-          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or path like "/org%"))`.
+          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or path like "/orgs/%"))`.
         force:
           type: boolean
           description: The flag allows to delete children of a matched node, even if they don't meet the filter criteria
@@ -473,7 +473,7 @@ components:
           description: The text query. The query must be formed in accordance with the query language of the underlying search engine.
         filterConditions:
           type: string
-          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or prefix(path, "/org"))`.
+          description: The filter conditions. The filters support `and`, `or` and `not` conditions for `format`, `path` and `tag("name")`, for instance, `tag("public") = "true" and format = "spreadsheetsData" and (path = "/orgs/1234/balance.xlsx" or path like "/orgs/%")`.
         groupByPathOff:
           type: boolean
           description: The flag turns off results grouping by path.

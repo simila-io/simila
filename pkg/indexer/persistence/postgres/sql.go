@@ -351,8 +351,8 @@ func (m *modelTx) DeleteNodes(query persistence.DeleteNodesQuery) error {
 	if !query.Force {
 		rows, err := m.db.Query(
 			"select n2.id "+
-				"from node as n2, (select * from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1"+
-				"where n1.flags = $1 and n2.path like concat(n1.path, '/%') and n2.id not in (select n.id from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") limit 1",
+				"from node as n2, (select n.* from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1 "+
+				"where n1.flags = $1 and n2.path like concat(n1.path, n1.name, '/%') and n2.id not in (select n.id from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") limit 1",
 			persistence.NodeFlagFolder)
 		if err != nil {
 			return persistence.MapError(err)
@@ -361,19 +361,19 @@ func (m *modelTx) DeleteNodes(query persistence.DeleteNodesQuery) error {
 			_ = rows.Close()
 		}()
 		if rows.Next() {
-			return fmt.Errorf("some deleted nodes have children, that don't match the condition: %w", errors.ErrConflict)
+			return fmt.Errorf("matched nodes have children that do not match the condition (force=%t): %w",
+				query.Force, errors.ErrConflict)
 		}
 	}
 	res, err := m.executor().ExecContext(m.ctx,
 		"delete from node as n2 "+
-			"using (select * from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1"+
-			"where n2.id = n1.id or (n1.flags = $1 and n2.path like concat(n1.path, '/%'))",
+			"using (select n.* from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1 "+
+			"where n2.id = n1.id or (n1.flags = $1 and n2.path like concat(n1.path, n1.name, '/%'))",
 		persistence.NodeFlagFolder)
 	if err != nil {
 		return persistence.MapError(err)
 	}
-	cnt, _ := res.RowsAffected()
-	if cnt == 0 {
+	if cnt, _ := res.RowsAffected(); cnt == 0 {
 		return errors.ErrNotExist
 	}
 	return nil
