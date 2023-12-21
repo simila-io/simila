@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/acquirecloud/golibs/cast"
 	context2 "github.com/acquirecloud/golibs/context"
 	"github.com/acquirecloud/golibs/errors"
@@ -103,7 +104,7 @@ func serve(ctx context.Context, path string, sc index.ServiceClient) {
 		for fn := range curFiles {
 			if _, ok := seen[fn]; !ok {
 				logger.Infof("the file %s seems to be removed from the folder ", fn)
-				if _, err := sc.DeleteNode(ctx, &index.Path{Path: fn}); err != nil && !errors.Is(err, errors.ErrNotExist) {
+				if _, err := sc.DeleteNodes(ctx, &index.DeleteNodesRequest{FilterConditions: fmt.Sprintf("path = '%s'", fn)}); err != nil && !errors.Is(err, errors.ErrNotExist) {
 					logger.Errorf("coud not delete the index %s: %s", fn, err)
 					continue
 				}
@@ -138,7 +139,7 @@ func uploadfile(ctx context.Context, dir string, fn string, sc index.ServiceClie
 		err := uploadfile2(ctx, dir, fn, sc)
 		if errors.Is(err, errors.ErrExist) {
 			logger.Infof("the index with id=%s already exists, let's delete it and rescan ", fn)
-			if _, err = sc.DeleteNode(ctx, &index.Path{Path: fn}); err != nil {
+			if _, err = sc.DeleteNodes(ctx, &index.DeleteNodesRequest{FilterConditions: fmt.Sprintf("path = '%s'", fn)}); err != nil {
 				return err
 			}
 			continue

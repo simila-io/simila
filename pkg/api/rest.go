@@ -238,6 +238,8 @@ func (r *Rest) errorRespnse(c *gin.Context, err error, msg string) bool {
 		status = http.StatusBadRequest
 	} else if errors.Is(err, errors.ErrExist) {
 		status = http.StatusConflict
+	} else if errors.Is(err, errors.ErrConflict) {
+		status = http.StatusConflict
 	} else if errors.Is(err, errors.ErrUnimplemented) {
 		status = http.StatusUnsupportedMediaType
 	}
