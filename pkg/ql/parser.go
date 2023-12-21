@@ -124,6 +124,14 @@ var (
 		"path": {
 			Flags: PfLValue | PfComparable | PfInLike,
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
+				sb.WriteString("n.path")
+				return nil
+			},
+		},
+
+		"node": {
+			Flags: PfLValue | PfComparable,
+			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
 				sb.WriteString("concat(n.path, n.name)")
 				return nil
 			},

@@ -83,7 +83,9 @@ paths:
       description: List nodes.
       operationId: ListNodes
       parameters:
-        - $ref: '#/components/parameters/PathFilter'
+        - $ref: '#/components/parameters/ConditionFilter'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Limit'
       responses:
         200:
           description: The nodes list retrieved successfully.
@@ -554,10 +556,10 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/Tags'
-    PathFilter:
+    ConditionFilter:
       in: query
-      name: path
-      description: The path specifies the path to filter by.
+      name: condition
+      description: The condition contatins the simila QL expression to select nodes by the filter
       required: false
       schema:
         type: string
@@ -577,6 +579,13 @@ components:
       schema:
         type: string
         format: date-time
+    Offset:
+      in: query
+      name: offset
+      description: The offset defines the number of the objects that should be skipped in the result response
+      required: false
+      schema:
+        type: integer
     Limit:
       in: query
       name: limit

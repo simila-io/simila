@@ -27,6 +27,7 @@ import (
 	"github.com/simila-io/simila/pkg/parser"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"io"
+	"strings"
 )
 
 // Service implements the gRPC API endpoints v1
@@ -106,7 +107,7 @@ func (s *Service) createRecords(ctx context.Context, request *index.CreateRecord
 	if len(pths) == 0 {
 		return &index.CreateRecordsResult{}, errors.GRPCWrap(fmt.Errorf("the path=%q should not be empty: %w", request.Path, errors.ErrInvalid))
 	}
-	nodes, err := mtx.ListNodes(request.Path)
+	nodes, err := mtx.ListAllNodesByPath(request.Path)
 	if err != nil {
 		return &index.CreateRecordsResult{}, errors.GRPCWrap(err)
 	}
@@ -182,14 +183,17 @@ func (s *Service) updateNode(ctx context.Context, request *index.UpdateNodeReque
 }
 
 func (s *Service) deleteNodes(ctx context.Context, dnr *index.DeleteNodesRequest) (*emptypb.Empty, error) {
+	res := &emptypb.Empty{}
 	force := cast.Value(dnr.Force, false)
 	s.logger.Infof("deleteNodes(): filter=%q, force=%t", dnr.FilterConditions, force)
+	if strings.Trim(dnr.FilterConditions, " ") == "" {
+		return res, errors.GRPCWrap(fmt.Errorf("the filter request cannot be empty: %w", errors.ErrInvalid))
+	}
 	mtx := s.Db.NewModelTx(ctx)
 	mtx.MustBegin()
 	defer func() {
 		_ = mtx.Rollback()
 	}()
-	res := &emptypb.Empty{}
 	err := mtx.DeleteNodes(persistence.DeleteNodesQuery{FilterConditions: dnr.FilterConditions, Force: force})
 	if err != nil {
 		return res, errors.GRPCWrap(err)
@@ -198,10 +202,13 @@ func (s *Service) deleteNodes(ctx context.Context, dnr *index.DeleteNodesRequest
 	return res, nil
 }
 
-func (s *Service) listNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
-	mtx := s.Db.NewModelTx(ctx)
+func (s *Service) listNodes(ctx context.Context, lnr *index.ListNodesRequest) (*index.Nodes, error) {
 	res := &index.Nodes{}
-	nodes, err := mtx.ListChildren(path.Path)
+	if strings.Trim(lnr.FilterConditions, " ") == "" {
+		return res, errors.GRPCWrap(fmt.Errorf("filter conditions cannot be empty: %w", errors.ErrInvalid))
+	}
+	mtx := s.Db.NewModelTx(ctx)
+	nodes, err := mtx.ListNodes(persistence.ListNodesQuery{FilterConditions: lnr.FilterConditions, Offset: lnr.Offset, Limit: lnr.Limit})
 	if err != nil {
 		return res, errors.GRPCWrap(err)
 	}
@@ -365,8 +372,8 @@ func (ids idxService) DeleteNodes(ctx context.Context, dnr *index.DeleteNodesReq
 	return ids.s.deleteNodes(ctx, dnr)
 }
 
-func (ids idxService) ListNodes(ctx context.Context, path *index.Path) (*index.Nodes, error) {
-	return ids.s.listNodes(ctx, path)
+func (ids idxService) ListNodes(ctx context.Context, lnr *index.ListNodesRequest) (*index.Nodes, error) {
+	return ids.s.listNodes(ctx, lnr)
 }
 
 func (ids idxService) ListRecords(ctx context.Context, request *index.ListRequest) (*index.ListRecordsResult, error) {

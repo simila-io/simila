@@ -259,10 +259,26 @@ func (m *modelTx) CreateNodes(nodes ...persistence.Node) ([]persistence.Node, er
 	return persistence.ScanRows[persistence.Node](rows)
 }
 
-func (m *modelTx) ListNodes(path string) ([]persistence.Node, error) {
+func (m *modelTx) ListNodes(query persistence.ListNodesQuery) ([]persistence.Node, error) {
+	var sb strings.Builder
+	if err := m.dbe.tr.Translate(&sb, query.FilterConditions); err != nil {
+		return nil, err
+	}
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name offset $1 limit $2", sb.String()), query.Offset, query.Limit)
+	if err != nil {
+		return nil, persistence.MapError(err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+	return persistence.ScanRows[persistence.Node](rows)
+}
+
+// ListAllNodesByPath returns all nodes for the path. For example for the path="/a/b/doc.txt"
+// the result nodes will be {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
+func (m *modelTx) ListAllNodesByPath(path string) ([]persistence.Node, error) {
 	var sb strings.Builder
 	var args []any
-
 	for _, p := range persistence.ToNodePathNamePairs(path) {
 		if sb.Len() > 0 {
 			sb.WriteString(" or ")
@@ -278,17 +294,7 @@ func (m *modelTx) ListNodes(path string) ([]persistence.Node, error) {
 	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name", where), args...)
 	if err != nil {
 		return nil, persistence.MapError(err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-	return persistence.ScanRows[persistence.Node](rows)
-}
 
-func (m *modelTx) ListChildren(path string) ([]persistence.Node, error) {
-	rows, err := m.executor().QueryxContext(m.ctx, "select * from node where path = $1 order by path, name", persistence.ToNodePath(path))
-	if err != nil {
-		return nil, persistence.MapError(err)
 	}
 	defer func() {
 		_ = rows.Close()

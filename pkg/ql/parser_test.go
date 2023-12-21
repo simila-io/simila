@@ -213,13 +213,21 @@ func TestPqFilterConditionsDialect(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, tr.Expression2Sql(&sb, e))
 
+	e, err = parser.ParseString("", "node like \"234\"")
+	assert.Nil(t, err)
+	assert.NotNil(t, tr.Expression2Sql(&sb, e))
+
 	e, err = parser.ParseString("", "tag('1234') = \"234\"")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
 
-	sb.Reset()
-	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3) or format like \"aaa%\"")
+	e, err = parser.ParseString("", "node = \"234\"")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
-	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in concat(n.path, n.name)) = 1 OR format = 1234.300049) OR format LIKE 'aaa%'", sb.String())
+
+	sb.Reset()
+	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3) or format like \"aaa%\" or node = '123'")
+	assert.Nil(t, err)
+	assert.Nil(t, tr.Expression2Sql(&sb, e))
+	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in n.path) = 1 OR ir.format = 1234.300049) OR ir.format LIKE 'aaa%' OR concat(n.path, n.name) = '123'", sb.String())
 }

@@ -17,7 +17,7 @@ service Service {
   // DeleteNode allows to delete nodes according to the request provided
   rpc DeleteNodes(DeleteNodesRequest) returns (google.protobuf.Empty);
   // ListNodes returns all known children for the Path provided
-  rpc ListNodes(Path) returns (Nodes);
+  rpc ListNodes(ListNodesRequest) returns (Nodes);
   // Patch allows to insert, update or delete an index's records
   rpc PatchRecords(PatchRecordsRequest) returns (PatchRecordsResult);
   // ListRecords returns list of records for a path associated with it
@@ -25,12 +25,6 @@ service Service {
   // Search runs the search across all the index records matching the query. Result will
   // be ordered by the ranks for the request.
   rpc Search(SearchRecordsRequest) returns (SearchRecordsResult);
-}
-
-// Path structure describes the list of nodes which identify a final node in the object tree.
-message Path {
-  // path is the nodes names separated by '/' like in the computer filesystem
-  string path = 1;
 }
 
 enum NodeType {
@@ -169,6 +163,14 @@ message UpdateNodeRequest {
   string path = 1;
   // node is the node data to be updated
   Node node = 2;
+}
+
+// ListNodesRequest allows to request some nodes by the condition
+message ListNodesRequest {
+  // filterConditions is used to select nodes. It cannot be empty
+  string filterConditions = 1;
+  int64 offset = 2;
+  int64 limit = 3;
 }
 
 // DelecteNodesRequest is used for deleting multiple nodes and their records

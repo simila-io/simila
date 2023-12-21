@@ -306,7 +306,7 @@ func (c cmdSearch) Prefix() string {
 // -------------------------------- cmdListNodes ----------------------------------
 
 func (c cmdListNodes) Run(prompt string) error {
-	nodes, err := c.cs.isc.ListNodes(c.cs.ctx, &index.Path{Path: prompt})
+	nodes, err := c.cs.isc.ListNodes(c.cs.ctx, &index.ListNodesRequest{FilterConditions: fmt.Sprintf("path=%q", prompt), Limit: 1000})
 	if err != nil {
 		return err
 	}

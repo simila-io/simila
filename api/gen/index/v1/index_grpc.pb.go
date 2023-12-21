@@ -43,7 +43,7 @@ type ServiceClient interface {
 	// DeleteNode allows to delete nodes according to the request provided
 	DeleteNodes(ctx context.Context, in *DeleteNodesRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// ListNodes returns all known children for the Path provided
-	ListNodes(ctx context.Context, in *Path, opts ...grpc.CallOption) (*Nodes, error)
+	ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*Nodes, error)
 	// Patch allows to insert, update or delete an index's records
 	PatchRecords(ctx context.Context, in *PatchRecordsRequest, opts ...grpc.CallOption) (*PatchRecordsResult, error)
 	// ListRecords returns list of records for a path associated with it
@@ -122,7 +122,7 @@ func (c *serviceClient) DeleteNodes(ctx context.Context, in *DeleteNodesRequest,
 	return out, nil
 }
 
-func (c *serviceClient) ListNodes(ctx context.Context, in *Path, opts ...grpc.CallOption) (*Nodes, error) {
+func (c *serviceClient) ListNodes(ctx context.Context, in *ListNodesRequest, opts ...grpc.CallOption) (*Nodes, error) {
 	out := new(Nodes)
 	err := c.cc.Invoke(ctx, Service_ListNodes_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -171,7 +171,7 @@ type ServiceServer interface {
 	// DeleteNode allows to delete nodes according to the request provided
 	DeleteNodes(context.Context, *DeleteNodesRequest) (*emptypb.Empty, error)
 	// ListNodes returns all known children for the Path provided
-	ListNodes(context.Context, *Path) (*Nodes, error)
+	ListNodes(context.Context, *ListNodesRequest) (*Nodes, error)
 	// Patch allows to insert, update or delete an index's records
 	PatchRecords(context.Context, *PatchRecordsRequest) (*PatchRecordsResult, error)
 	// ListRecords returns list of records for a path associated with it
@@ -198,7 +198,7 @@ func (UnimplementedServiceServer) UpdateNode(context.Context, *UpdateNodeRequest
 func (UnimplementedServiceServer) DeleteNodes(context.Context, *DeleteNodesRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteNodes not implemented")
 }
-func (UnimplementedServiceServer) ListNodes(context.Context, *Path) (*Nodes, error) {
+func (UnimplementedServiceServer) ListNodes(context.Context, *ListNodesRequest) (*Nodes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListNodes not implemented")
 }
 func (UnimplementedServiceServer) PatchRecords(context.Context, *PatchRecordsRequest) (*PatchRecordsResult, error) {
@@ -304,7 +304,7 @@ func _Service_DeleteNodes_Handler(srv interface{}, ctx context.Context, dec func
 }
 
 func _Service_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Path)
+	in := new(ListNodesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func _Service_ListNodes_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: Service_ListNodes_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServiceServer).ListNodes(ctx, req.(*Path))
+		return srv.(ServiceServer).ListNodes(ctx, req.(*ListNodesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

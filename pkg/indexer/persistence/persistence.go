@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package persistence
 
 import (
@@ -49,14 +48,11 @@ type (
 		// CreateNodes allows to create one or several new Nodes. If a Node with the path already exists,
 		// the function will return ErrExists.
 		CreateNodes(nodes ...Node) ([]Node, error)
-		// ListNodes returns all nodes for the path. For example for the path="/a/b/doc.txt"
+		// ListAllNodesByPath returns all nodes for the path. For example for the path="/a/b/doc.txt"
 		// the result nodes will be {<"/", "a">, {<"/a/", "b">, <"/a/b/", "doc.txt">}
-		ListNodes(path string) ([]Node, error)
-		// ListChildren returns the children for the path: all nodes of the 1st level with the path prefix in Path
-		//
-		// Example: for the nodes={<"/", "a">, <"/a/", "c">, <"/a/", "b">, <"/a/b/", "cc">}
-		// the result for the "/a/" will be {<"/a/", "c">, <"/a/", "b">}
-		ListChildren(path string) ([]Node, error)
+		ListAllNodesByPath(path string) ([]Node, error)
+		// ListNodes returns the nodes according to the query filter request
+		ListNodes(query ListNodesQuery) ([]Node, error)
 
 		// GetNode returns the node by its fqnp
 		GetNode(fqnp string) (Node, error)

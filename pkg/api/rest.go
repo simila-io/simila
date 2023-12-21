@@ -38,7 +38,8 @@ func (r *Rest) RegisterEPs(g *gin.Engine) error {
 }
 
 func (r *Rest) ListNodes(c *gin.Context, params similapi.ListNodesParams) {
-	nodes, err := r.svc.IndexServiceServer().ListNodes(c, &index.Path{Path: cast.Value(params.Path, "")})
+	nodes, err := r.svc.IndexServiceServer().ListNodes(c, &index.ListNodesRequest{FilterConditions: cast.Value(params.Condition, ""),
+		Offset: int64(cast.Value(params.Offset, 0)), Limit: int64(cast.Value(params.Limit, 100))})
 	if r.errorRespnse(c, err, "") {
 		return
 	}

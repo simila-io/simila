@@ -103,6 +103,14 @@ type (
 		Force bool
 	}
 
+	// ListNodesQuery allows to select nodes by the condition provided
+	ListNodesQuery struct {
+		// FilterConditions contains the node selection filter
+		FilterConditions string
+		Offset           int64
+		Limit            int64
+	}
+
 	QueryResult[T any, N any] struct {
 		Items  []T
 		NextID N
