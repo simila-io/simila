@@ -53,7 +53,7 @@ create index if not exists "idx_node_created_at" on "node" ("created_at");
 
 create table if not exists "index_record"
 (
-    "id"              varchar(64)   not null,
+    "id"              varchar(255)  not null,
     "node_id"         bigint        not null references "node" ("id") on delete cascade,
     "segment"         text         	not null,
     "vector"   	      bytea,
