@@ -228,5 +228,5 @@ func TestPqFilterConditionsDialect(t *testing.T) {
 	e, err = parser.ParseString("", "tag('abc') = tag(\"def\") and (prefix(path, \"/aaa/\") or format = 1234.3) or format like \"aaa%\" or node = '123'")
 	assert.Nil(t, err)
 	assert.Nil(t, tr.Expression2Sql(&sb, e))
-	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in n.path) = 1 OR ir.format = 1234.300049) OR ir.format LIKE 'aaa%' OR concat(n.path, n.name) = '123'", sb.String())
+	assert.Equal(t, "n.tags ->> 'abc' = n.tags ->> 'def' AND ( position('/aaa/' in n.path) = 1 OR ir.format = 1234.300049) OR ir.format LIKE 'aaa%' OR n.name = '123'", sb.String())
 }

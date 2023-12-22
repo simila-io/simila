@@ -74,6 +74,7 @@ func SessionParams() map[string]any {
 // see https://www.postgresql.org/docs/current/pgtrgm.html.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
+	sb.Grow(2 * len(q.FilterConditions))
 	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
@@ -100,7 +101,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			) as r`, where)
 
 		query = fmt.Sprintf(`select ir.*,
-			concat(n.path, n.name) as path,
+			n.name as path,
 			((1 - (ir.segment <->> $%d))*ir.rank_multiplier) as score
 			from index_record as ir
 			inner join node as n on n.id = ir.node_id
@@ -122,12 +123,12 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			r.score as score
 			from (
 				select ir.node_id,
-				concat(n.path, n.name) as fullpath,
+				n.name as fullpath,
 				max((1 - (ir.segment <->> $%d))*ir.rank_multiplier) as score
 				from index_record as ir
 				inner join node as n on n.id = ir.node_id
 				where %s
-				group by ir.node_id, fullpath
+				group by ir.node_id, n.name
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			((1 - (segment <->> $%d))*rank_multiplier) = r.score

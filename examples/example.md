@@ -72,19 +72,19 @@ curl -s -XPOST -H "content-type: application/json" -d "{\"nodeType\": \"document
 List organization node children:
 
 ```bash
-curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
+curl -s -XGET "http://localhost:8080/v1/nodes?condition=path=\"/orgs/\"" | jq
 ```
 
 List `Coca-Cola Company` node children:
 
 ```bash
-curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs/1234" | jq
+curl -s -XGET "http://localhost:8080/v1/nodes?condition=path=\"/orgs/1234/\"" | jq
 ```
 
 List `Ford Motors Company` node children
 
 ```bash
-curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs/5678" | jq
+curl -s -XGET "http://localhost:8080/v1/nodes?condition=path=\"/orgs/5678/\"" | jq
 ```
 
 ### 5. Search created records by specifying different paths, tags etc.
@@ -110,7 +110,7 @@ curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", 
 Search the `Coca-Cola Company` balance node only, return all the matched records for the node:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "node = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 ### 6. Add, update and delete searchable records of a node
@@ -126,7 +126,7 @@ curl -s -XPATCH -H "content-type: application/json" -d "{ \"upsertRecords\": [{\
 Search the `Coca-Cola Company` balance node only, check that the records have changed:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "node = \"/orgs/1234/balance.xlsx\"", "groupByPathOff": true, "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```
 
 ### 8. Delete nodes
@@ -142,7 +142,7 @@ curl -i -XDELETE -H "content-type: application/json" -d '{"filterConditions": "p
 List the organization node children, only the `Ford Motors Company` nodes are expected:
 
 ```bash 
-curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
+curl -s -XGET "http://localhost:8080/v1/nodes?condition=path=\"/orgs/\"" | jq
 ```
 
 ### 10. Search the records of all the organizations
@@ -150,5 +150,5 @@ curl -s -XGET "http://localhost:8080/v1/nodes?path=/orgs" | jq
 Search the organization node children, only the `Ford Motors Company` records are expected:
 
 ```bash
-curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/orgs/%\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
+curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", "filterConditions": "path like \"/%\"", "offset":0, "limit":100}' "http://localhost:8080/v1/search" | jq
 ```

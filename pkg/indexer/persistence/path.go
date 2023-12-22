@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"fmt"
+	"github.com/acquirecloud/golibs/errors"
 	"path/filepath"
 	"strings"
 )
@@ -30,7 +32,13 @@ func Path(names []string) string {
 	if len(names) == 0 {
 		return "/"
 	}
+	ln := 0
+	for _, n := range names {
+		ln += len(n)
+	}
+	ln += len(names)
 	var sb strings.Builder
+	sb.Grow(ln)
 	for _, n := range names {
 		sb.WriteString("/")
 		sb.WriteString(n)
@@ -38,9 +46,28 @@ func Path(names []string) string {
 	return sb.String()
 }
 
+// CleanName checks whether the name contains '/' and trims spaces if needed. It returns the modified name or
+// an error if any
+func CleanName(name string) (string, error) {
+	pieces := SplitPath(name)
+	if len(pieces) != 1 {
+		return name, fmt.Errorf("the name %q is incorrect, it cannot contain / symbols: %w", name, errors.ErrInvalid)
+	}
+	if pieces[0] == "" {
+		return name, fmt.Errorf("the name %q is an empty string, not allowed: %w", name, errors.ErrInvalid)
+	}
+	return pieces[0], nil
+}
+
 // ConcatPath allows to concat two paths
 func ConcatPath(p1, p2 string) string {
-	return filepath.Clean("/" + p1 + "/" + p2)
+	var sb strings.Builder
+	sb.Grow(len(p1) + len(p2) + 2)
+	sb.WriteString("/")
+	sb.WriteString(p1)
+	sb.WriteString("/")
+	sb.WriteString(p2)
+	return filepath.Clean(sb.String())
 }
 
 // ToNodePath returns the path in a form as expected by Node
@@ -67,22 +94,4 @@ func ToNodePathName(path string) (string, string) { // path, name
 		path += "/"
 	}
 	return path, strings.TrimSpace(parts[len(parts)-1])
-}
-
-// ToNodePathNamePairs returns all the possible {path, name} pairs along the given path as expected by Node
-func ToNodePathNamePairs(path string) [][]string {
-	pairs := make([][]string, 0)
-	parts := SplitPath(path)
-
-	var sb strings.Builder
-	sb.WriteString("/")
-
-	for i := 0; i < len(parts); i++ {
-		if i > 0 {
-			sb.WriteString(parts[i-1])
-			sb.WriteString("/")
-		}
-		pairs = append(pairs, []string{sb.String(), parts[i]})
-	}
-	return pairs
 }

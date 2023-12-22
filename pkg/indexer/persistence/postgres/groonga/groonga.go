@@ -63,6 +63,7 @@ func Migrations(rollback bool) []*migrate.Migration {
 // see https://pgroonga.github.io/reference/operators/query-v2.html.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
+	sb.Grow(2 * len(q.FilterConditions))
 	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
@@ -89,7 +90,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			) as r`, where)
 
 		query = fmt.Sprintf(`select ir.*,
-			concat(n.path, n.name) as path,
+			n.name as path,
 			(pgroonga_score(ir.tableoid, ir.ctid)*ir.rank_multiplier) as score,
 			pgroonga_highlight_html(ir.segment, pgroonga_query_extract_keywords($%d)) as matched_keywords
 			from index_record as ir
@@ -113,12 +114,12 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			pgroonga_highlight_html(segment, pgroonga_query_extract_keywords($%d)) as matched_keywords
 			from (
 				select ir.node_id,
-				concat(n.path, n.name) as fullpath,
+				n.name as fullpath,
 				max(pgroonga_score(ir.tableoid, ir.ctid)*ir.rank_multiplier) as score
 				from index_record as ir
 				inner join node as n on n.id = ir.node_id
 				where %s
-				group by ir.node_id, fullpath
+				group by ir.node_id, n.name
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			(pgroonga_score(index_record.tableoid, index_record.ctid)*rank_multiplier) = r.score

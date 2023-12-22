@@ -91,6 +91,7 @@ func Migrations(rollback bool) []*migrate.Migration {
 // see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-PARSING-QUERIES.
 func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQuery) (persistence.SearchQueryResult, error) {
 	var sb strings.Builder
+	sb.Grow(2 * len(q.FilterConditions))
 	if err := FcTranslator.Translate(&sb, q.FilterConditions); err != nil {
 		return persistence.SearchQueryResult{}, persistence.MapError(err)
 	}
@@ -118,7 +119,7 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			) as r`, where)
 
 		query = fmt.Sprintf(`select ir.*,
-			concat(n.path, n.name) as path,
+			n.name as path,
 			(ts_rank_cd(ir.segment_tsvector, websearch_to_tsquery('simila', $%d))*ir.rank_multiplier) as score,
 			ts_headline('simila', ir.segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
 			from index_record as ir
@@ -142,12 +143,12 @@ func Search(ctx context.Context, qx sqlx.QueryerContext, q persistence.SearchQue
 			ts_headline('simila', segment, websearch_to_tsquery('simila', $%d), '%s') as matched_keywords
 			from (
 				select ir.node_id,
-				concat(n.path, n.name) as fullpath,
+				n.name as fullpath,
 				max(ts_rank_cd(ir.segment_tsvector, websearch_to_tsquery('simila', $%d))*ir.rank_multiplier) as score
 				from index_record as ir
 				inner join node as n on n.id = ir.node_id
 				where %s
-				group by ir.node_id, fullpath
+				group by ir.node_id, n.name
 			) as r
 			inner join index_record on index_record.node_id = r.node_id and
 			(ts_rank_cd(segment_tsvector, websearch_to_tsquery('simila', $%d))*rank_multiplier) = r.score

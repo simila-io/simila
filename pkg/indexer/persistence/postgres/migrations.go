@@ -38,18 +38,19 @@ create table if not exists "node"
 (
     "id"         bigserial                not null,
     "path"       varchar(1024)            not null,
-    "name"       varchar(255)             not null,
+    "name"       varchar(1024)            not null,
     "tags"       jsonb                    not null default '{}'::jsonb,
     "flags"      integer                  not null default 0,
     "created_at" timestamp with time zone not null default (now() at time zone 'utc'),
     "updated_at" timestamp with time zone not null default (now() at time zone 'utc'),
     primary key ("id"),
-	unique("path", "name")
+	unique("name")    
 );
 
 create index if not exists "idx_node_tags" on "node" using gin ("tags");
 create index if not exists "idx_node_flags" on "node" ("flags");
 create index if not exists "idx_node_created_at" on "node" ("created_at");
+create index if not exists "idx_node_path" on "node" ("path");
 
 create table if not exists "index_record"
 (

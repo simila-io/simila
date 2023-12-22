@@ -132,7 +132,7 @@ var (
 		"node": {
 			Flags: PfLValue | PfComparable,
 			Translate: func(tr Translator, sb *strings.Builder, p Param) error {
-				sb.WriteString("concat(n.path, n.name)")
+				sb.WriteString("n.name")
 				return nil
 			},
 		},

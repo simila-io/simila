@@ -230,8 +230,11 @@ func (m *modelTx) CreateNodes(nodes ...persistence.Node) ([]persistence.Node, er
 		if len(n.Path) == 0 {
 			return nil, fmt.Errorf("node path for item=%d must be specified: %w", i, errors.ErrInvalid)
 		}
-		if len(n.Name) == 0 {
-			return nil, fmt.Errorf("node name for item=%d must be specified: %w", i, errors.ErrInvalid)
+		n.Path = persistence.ToNodePath(n.Path)
+		var err error
+		n.Name, err = persistence.CleanName(n.Name)
+		if err != nil {
+			return nil, err
 		}
 		if n.Tags == nil {
 			n.Tags = make(persistence.Tags)
@@ -243,8 +246,8 @@ func (m *modelTx) CreateNodes(nodes ...persistence.Node) ([]persistence.Node, er
 		sb.WriteString(fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", firstIdx, firstIdx+1, firstIdx+2, firstIdx+3, firstIdx+4, firstIdx+5))
 		firstIdx += 6
 
-		params = append(params, persistence.ToNodePath(n.Path))
-		params = append(params, strings.TrimSpace(n.Name))
+		params = append(params, n.Path)
+		params = append(params, persistence.ConcatPath(n.Path, n.Name))
 		params = append(params, n.Tags)
 		params = append(params, n.Flags)
 		params = append(params, now)
@@ -264,14 +267,14 @@ func (m *modelTx) ListNodes(query persistence.ListNodesQuery) ([]persistence.Nod
 	if err := m.dbe.tr.Translate(&sb, query.FilterConditions); err != nil {
 		return nil, err
 	}
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name offset $1 limit $2", sb.String()), query.Offset, query.Limit)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node as n where %s order by n.name offset $1 limit $2", sb.String()), query.Offset, query.Limit)
 	if err != nil {
 		return nil, persistence.MapError(err)
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
-	return persistence.ScanRows[persistence.Node](rows)
+	return scanNodes(rows)
 }
 
 // ListAllNodesByPath returns all nodes for the path. For example for the path="/a/b/doc.txt"
@@ -279,19 +282,22 @@ func (m *modelTx) ListNodes(query persistence.ListNodesQuery) ([]persistence.Nod
 func (m *modelTx) ListAllNodesByPath(path string) ([]persistence.Node, error) {
 	var sb strings.Builder
 	var args []any
-	for _, p := range persistence.ToNodePathNamePairs(path) {
+	pathSoFar := "/"
+	names := persistence.SplitPath(path)
+	for _, n := range names {
 		if sb.Len() > 0 {
 			sb.WriteString(" or ")
 		}
-		sb.WriteString("(path = ? and name = ?)")
-		args = append(args, p[0], p[1])
+		sb.WriteString("name = ?")
+		pathSoFar = persistence.ConcatPath(pathSoFar, n)
+		args = append(args, pathSoFar)
 	}
 	if sb.Len() == 0 {
 		return nil, nil
 	}
 
 	where := sqlx.Rebind(sqlx.DOLLAR, sb.String())
-	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by path, name", where), args...)
+	rows, err := m.executor().QueryxContext(m.ctx, fmt.Sprintf("select * from node where %s order by name", where), args...)
 	if err != nil {
 		return nil, persistence.MapError(err)
 
@@ -299,15 +305,15 @@ func (m *modelTx) ListAllNodesByPath(path string) ([]persistence.Node, error) {
 	defer func() {
 		_ = rows.Close()
 	}()
-	return persistence.ScanRows[persistence.Node](rows)
+	return scanNodes(rows)
 }
 
 func (m *modelTx) GetNode(fqnp string) (persistence.Node, error) {
-	path, name := persistence.ToNodePathName(fqnp)
 	var node persistence.Node
-	if err := m.executor().GetContext(m.ctx, &node, "select * from node where path=$1 and name = $2", path, name); err != nil {
+	if err := m.executor().GetContext(m.ctx, &node, "select * from node where name = $1", fqnp); err != nil {
 		return persistence.Node{}, persistence.MapError(err)
 	}
+	cleanNameAfterRead(&node)
 	return node, nil
 }
 
@@ -352,7 +358,7 @@ func (m *modelTx) DeleteNodes(query persistence.DeleteNodesQuery) error {
 		rows, err := m.db.Query(
 			"select n2.id "+
 				"from node as n2, (select n.* from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1 "+
-				"where n1.flags = $1 and n2.path like concat(n1.path, n1.name, '/%') and n2.id not in (select n.id from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") limit 1",
+				"where n1.flags = $1 and n2.path like concat(n1.name, '%') and n2.id not in (select n.id from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") limit 1",
 			persistence.NodeFlagFolder)
 		if err != nil {
 			return persistence.MapError(err)
@@ -368,7 +374,7 @@ func (m *modelTx) DeleteNodes(query persistence.DeleteNodesQuery) error {
 	res, err := m.executor().ExecContext(m.ctx,
 		"delete from node as n2 "+
 			"using (select n.* from node as n left join index_record as ir on ir.node_id = n.id where "+filter+") as n1 "+
-			"where n2.id = n1.id or (n1.flags = $1 and n2.path like concat(n1.path, n1.name, '/%'))",
+			"where n2.id = n1.id or (n1.flags = $1 and n2.path like concat(n1.name, '%'))",
 		persistence.NodeFlagFolder)
 	if err != nil {
 		return persistence.MapError(err)
@@ -548,4 +554,23 @@ func (m *modelTx) Search(query persistence.SearchQuery) (persistence.SearchQuery
 		return m.dbe.searchFn(m.ctx, m.executor(), query)
 	}
 	return persistence.SearchQueryResult{}, errors.ErrUnimplemented
+}
+
+func scanNodes(rows *sqlx.Rows) ([]persistence.Node, error) {
+	nodes, err := persistence.ScanRows[persistence.Node](rows)
+	if err != nil {
+		return nodes, err
+	}
+	for i, n := range nodes {
+		cleanNameAfterRead(&n)
+		nodes[i] = n
+	}
+	return nodes, nil
+}
+
+func cleanNameAfterRead(n *persistence.Node) {
+	if n == nil {
+		return
+	}
+	n.Name = n.Name[len(n.Path):]
 }
