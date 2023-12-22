@@ -134,7 +134,7 @@ curl -s -XPOST -H "content-type: application/json" -d '{"textQuery": "company", 
 Delete the `Coca-Cola Company` node and all its children nodes and records:
 
 ```bash
-curl -i -XDELETE -H "content-type: application/json" -d '{"filterConditions": "path like \"/orgs/1234%\""}' "http://localhost:8080/v1/nodes"
+curl -i -XDELETE -H "content-type: application/json" -d '{"filterConditions": "node = \"/orgs/1234\""}' "http://localhost:8080/v1/nodes"
 ```
 
 ### 9. List the nodes after deletion
